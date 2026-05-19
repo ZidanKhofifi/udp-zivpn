@@ -7,10 +7,7 @@ echo "========================================="
 sleep 1
 
 echo "[*] Mengunduh pembaruan menu dari GitHub..."
-# Mengunduh file menu.sh terbaru dan langsung menimpa file lama di /usr/bin/
-wget -q -O /usr/bin/menu.sh "https://raw.githubusercontent.com/ZidanKhofifi/udp-zivpn/main/menu.sh"
-
-# Memberikan kembali izin akses eksekusi
+curl -sL "https://raw.githubusercontent.com/ZidanKhofifi/udp-zivpn/main/menu.sh" -o /usr/bin/menu.sh
 chmod +x /usr/bin/menu.sh
 
 echo "========================================="
