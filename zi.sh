@@ -61,9 +61,9 @@ Utils() {
   esac
 }
 
-# Fungsi Sinkronisasi: Merakit ulang config.json dalam format Array JSON murni tanpa python
+# Fungsi Sinkronisasi: Merakit ulang config.json dalam format Array JSON dengan Unix Epoch
 sync_to_zivpn_json() {
-    today=$(date +%Y-%m-%d)
+    today_epoch=$(date +%s)
     
     cat <<EOF > "$Dir/config.json"
 {
@@ -77,11 +77,8 @@ sync_to_zivpn_json() {
 EOF
 
     first=true
-    while IFS='|' read -r pass days exp; do
-        exp_num=$(echo "$exp" | tr -d '-')
-        today_num=$(echo "$today" | tr -d '-')
-
-        if [[ -n "$pass" && -n "$exp_num" && "$exp_num" -ge "$today_num" ]]; then
+    while IFS='|' read -r pass duration exp; do
+        if [[ -n "$pass" && -n "$exp" && "$exp" -ge "$today_epoch" ]]; then
             if [ "$first" = true ]; then
                 echo "      \"$pass\"" >> "$Dir/config.json"
                 first=false
@@ -142,6 +139,7 @@ Uninstall() {
   rm -f /etc/systemd/system/z-api.service
   rm -rf /etc/z-api
   rm -rf "$DB_DIR"
+  rm -f /etc/cron.d/zivpn-cleaner
 }
 
 Install() {
@@ -194,51 +192,10 @@ END
     PostKernel
     RoutingTables
     
-    # Daftarkan pembersih otomatis harian (Cron Job harian)
-    cat <<'EOF' > /etc/cron.daily/zivpn-cleaner
-#!/bash/bin
-DB_FILE="/etc/z-tunnel/database.db"
-Dir="/etc/zivpn"
-today=$(date +%Y-%m-%d)
-if [ -f "$DB_FILE" ]; then
-    today_num=$(date +%Y%m%d)
-    touch "${DB_FILE}.tmp"
-    while IFS='|' read -r pass days exp; do
-        exp_num=$(echo "$exp" | tr -d '-')
-        if [[ -n "$pass" && -n "$exp_num" && "$exp_num" -ge "$today_num" ]]; then
-            echo "$pass|$days|$exp" >> "${DB_FILE}.tmp"
-        fi
-    done < "$DB_FILE"
-    mv "${DB_FILE}.tmp" "$DB_FILE"
-    
-    cat <<EOF2 > "$Dir/config.json"
-{
-  "listen": ":5667",
-  "cert": "$Dir/zivpn.crt",
-  "key": "$Dir/zivpn.key",
-  "obfs": "zivpn",
-  "auth": {
-    "mode": "passwords",
-    "config": [
-EOF2
-    first=true
-    while IFS='|' read -r pass days exp; do
-        if [ "$first" = true ]; then
-            echo "      \"$pass\"" >> "$Dir/config.json"
-            first=false
-        else
-            echo "      ,\"$pass\"" >> "$Dir/config.json"
-        fi
-    done < "$DB_FILE"
-    cat <<EOF3 >> "$Dir/config.json"
-    ]
-  }
-}
-EOF3
-    systemctl restart zivpn >/dev/null 2>&1
-fi
-EOF
-    chmod +x /etc/cron.daily/zivpn-cleaner
+    # Daftarkan pembersih otomatis menit kustom (Cron Job setiap menit)
+    echo "* * * * * root bash /usr/local/bin/zi.sh clean >/dev/null 2>&1" > /etc/cron.d/zivpn-cleaner
+    chmod 644 /etc/cron.d/zivpn-cleaner
+    systemctl restart cron >/dev/null 2>&1
     
     echo -e "\n➜ ZIVPN UDP Potato Engine Berhasil Terpasang!\n"
   else
@@ -296,11 +253,11 @@ app.get('/list', authenticate, (req, res) => {
     });
 });
 
-
 app.post('/account', authenticate, (req, res) => {
-    const { type, password, days } = req.body;
+    const { type, password, days, minutes } = req.body;
     if (type === 'trial') {
-        exec('bash /usr/local/bin/zi.sh trial', (err, stdout) => {
+        const trialMinutes = minutes || 30;
+        exec(\`printf "\${trialMinutes}\n" | bash /usr/local/bin/zi.sh trial\`, (err, stdout) => {
             if (err) return res.status(500).json({ status: false, error: err.message });
             return res.json({ status: true, message: 'Trial Created', output: stdout });
         });
@@ -375,7 +332,8 @@ case "$1" in
         exit 1
     fi
     
-    exp_date=$(date -d "+$PREMIUM_DAYS days" +%Y-%m-%d)
+    exp_date=$(date -d "+$PREMIUM_DAYS days" +%s)
+    readable_exp=$(date -d "@$exp_date" "+%Y-%m-%d %H:%M:%S")
     echo "$PREMIUM_PASS|$PREMIUM_DAYS|$exp_date" >> "$DB_FILE"
     sync_to_zivpn_json
     
@@ -385,15 +343,21 @@ case "$1" in
     echo -e " Host/Domain: $CURRENT_DOMAIN"
     echo -e " Password   : $PREMIUM_PASS"
     echo -e " Masa Aktif : $PREMIUM_DAYS Hari"
-    echo -e " Expired On : $exp_date"
+    echo -e " Expired On : $readable_exp"
     echo -e " Port Range : 6000 - 19999 (UDP)"
     echo -e "=========================================\n"
     ;;
     
   'trial')
+    read -p " Masukkan Durasi (Menit): " TRIAL_MINUTES
+    if [[ -z "$TRIAL_MINUTES" || ! "$TRIAL_MINUTES" =~ ^[0-9]+$ ]]; then
+        TRIAL_MINUTES=30
+    fi
+    
     TRIAL_PASS=$(shuf -i 100000-999999 -n 1)
-    exp_date=$(date -d "+1 day" +%Y-%m-%d)
-    echo "$TRIAL_PASS|1|$exp_date" >> "$DB_FILE"
+    exp_date=$(date -d "+$TRIAL_MINUTES minutes" +%s)
+    readable_exp=$(date -d "@$exp_date" "+%Y-%m-%d %H:%M:%S")
+    echo "$TRIAL_PASS|$TRIAL_MINUTES|$exp_date" >> "$DB_FILE"
     sync_to_zivpn_json
     
     echo -e "\n========================================="
@@ -401,8 +365,8 @@ case "$1" in
     echo -e "========================================="
     echo -e " Host/Domain: $CURRENT_DOMAIN"
     echo -e " Password   : $TRIAL_PASS"
-    echo -e " Masa Aktif : 1 Hari"
-    echo -e " Expired On : $exp_date"
+    echo -e " Masa Aktif : $TRIAL_MINUTES Menit"
+    echo -e " Expired On : $readable_exp"
     echo -e " Port Range : 6000 - 19999 (UDP)"
     echo -e "=========================================\n"
     ;;
@@ -425,17 +389,16 @@ case "$1" in
     echo -e "\n====================================================="
     echo -e "               DAFTAR AKUN UDP ACTIVE                "
     echo -e "====================================================="
-    printf "%-15s | %-12s | %-15s\n" "PASSWORD" "DURASI (HARI)" "TANGGAL EXPIRED"
+    printf "%-15s | %-12s | %-19s\n" "PASSWORD" "DURASI" "TANGGAL EXPIRED"
     echo "-----------------------------------------------------"
-    today=$(date +%Y-%m-%d)
-    while IFS='|' read -r pass days exp; do
+    today_epoch=$(date +%s)
+    while IFS='|' read -r pass duration exp; do
         if [[ -n "$pass" ]]; then
-            exp_num=$(echo "$exp" | tr -d '-')
-            today_num=$(echo "$today" | tr -d '-')
-            if [[ "$exp_num" -lt "$today_num" ]]; then
-                printf "%-15s | %-12s | %-15s \033[0;31m(Expired)\033[0m\n" "$pass" "$days" "$exp"
+            readable_exp=$(date -d "@$exp" "+%Y-%m-%d %H:%M:%S")
+            if [[ "$exp" -lt "$today_epoch" ]]; then
+                printf "%-15s | %-12s | %-19s \033[0;31m(Expired)\033[0m\n" "$pass" "$duration" "$readable_exp"
             else
-                printf "%-15s | %-12s | %-15s \033[0;32m(Aktif)\033[0m\n" "$pass" "$days" "$exp"
+                printf "%-15s | %-12s | %-19s \033[0;32m(Aktif)\033[0m\n" "$pass" "$duration" "$readable_exp"
             fi
         fi
     done < "$DB_FILE"
@@ -471,9 +434,22 @@ case "$1" in
         echo -e "\n➜ Berkas cadangan tidak ditemukan.\n"
     fi
     ;;
+
+  'clean')
+    today_epoch=$(date +%s)
+    if [ -f "$DB_FILE" ]; then
+        touch "${DB_FILE}.tmp"
+        while IFS='|' read -r pass duration exp; do
+            if [[ -n "$pass" && -n "$exp" && "$exp" -ge "$today_epoch" ]]; then
+                echo "$pass|$duration|$exp" >> "${DB_FILE}.tmp"
+            fi
+        done < "$DB_FILE"
+        mv "${DB_FILE}.tmp" "$DB_FILE"
+        sync_to_zivpn_json
+    fi
+    ;;
     
   *)
-    echo -e "\n Gunakan perintah: zi.sh [install|uninstall|api|add|trial|del|list|domain|backup|restore]\n"
+    echo -e "\n Gunakan perintah: zi.sh [install|uninstall|api|add|trial|del|list|domain|backup|restore|clean]\n"
     ;;
 esac
-
