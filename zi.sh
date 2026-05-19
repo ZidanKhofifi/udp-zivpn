@@ -289,6 +289,14 @@ const authenticate = (req, res, next) => {
     }
 };
 
+app.get('/list', authenticate, (req, res) => {
+    exec('bash /usr/local/bin/zi.sh list', (err, stdout) => {
+        if (err) return res.status(500).json({ status: false, message: 'Gagal ambil data' });
+        return res.json({ status: true, output: stdout });
+    });
+});
+
+
 app.post('/account', authenticate, (req, res) => {
     const { type, password, days } = req.body;
     if (type === 'trial') {
