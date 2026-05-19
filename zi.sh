@@ -257,13 +257,13 @@ app.post('/account', authenticate, (req, res) => {
     const { type, password, days, minutes } = req.body;
     if (type === 'trial') {
         const trialMinutes = minutes || 30;
-        exec(\`printf "\${trialMinutes}\n" | bash /usr/local/bin/zi.sh trial\`, (err, stdout) => {
+        exec(\`bash /usr/local/bin/zi.sh trial "\${trialMinutes}"\`, (err, stdout) => {
             if (err) return res.status(500).json({ status: false, error: err.message });
             return res.json({ status: true, message: 'Trial Created', output: stdout });
         });
     } else if (type === 'premium') {
         if (!password || !days) return res.status(400).json({ status: false, message: 'Missing parameters' });
-        exec(\`printf "\${password}\n\${days}\n" | bash /usr/local/bin/zi.sh add\`, (err, stdout) => {
+        exec(\`bash /usr/local/bin/zi.sh add "\${password}" "\${days}"\`, (err, stdout) => {
             if (err) return res.status(500).json({ status: false, error: err.message });
             return res.json({ status: true, message: 'Premium Created', output: stdout });
         });
@@ -275,7 +275,7 @@ app.post('/account', authenticate, (req, res) => {
 app.delete('/account', authenticate, (req, res) => {
     const { password } = req.body;
     if (!password) return res.status(400).json({ status: false, message: 'Missing password' });
-    exec(\`printf "\${password}\n" | bash /usr/local/bin/zi.sh del\`, (err, stdout) => {
+    exec(\`bash /usr/local/bin/zi.sh del "\${password}"\`, (err, stdout) => {
         if (err) return res.status(500).json({ status: false, error: err.message });
         return res.json({ status: true, message: 'Account Deleted', output: stdout });
     });
@@ -317,11 +317,16 @@ case "$1" in
   'uninstall') Uninstall; echo -e "\n➜ Bersih total.\n" ;;
   'api') SetupAPI ;;
   'add')
-    echo -e "\n========================================="
-    echo -e "           BUAT AKUN PREMIUM             "
-    echo -e "========================================="
-    read -p " Masukkan Password : " PREMIUM_PASS
-    read -p " Masukkan Masa Aktif (Hari): " PREMIUM_DAYS
+    PREMIUM_PASS="$2"
+    PREMIUM_DAYS="$3"
+    
+    if [[ -z "$PREMIUM_PASS" || -z "$PREMIUM_DAYS" ]]; then
+        echo -e "\n========================================="
+        echo -e "           BUAT AKUN PREMIUM             "
+        echo -e "========================================="
+        read -p " Masukkan Password : " PREMIUM_PASS
+        read -p " Masukkan Masa Aktif (Hari): " PREMIUM_DAYS
+    fi
     
     if [[ -z "$PREMIUM_PASS" || -z "$PREMIUM_DAYS" || ! "$PREMIUM_DAYS" =~ ^[0-9]+$ ]]; then
         echo -e "\n➜ Error: Input tidak valid!\n"
@@ -349,7 +354,15 @@ case "$1" in
     ;;
     
   'trial')
-    read -p " Masukkan Durasi (Menit): " TRIAL_MINUTES
+    TRIAL_MINUTES="$2"
+    
+    if [[ -z "$TRIAL_MINUTES" ]]; then
+        echo -e "\n========================================="
+        echo -e "           BUAT AKUN TRIAL               "
+        echo -e "========================================="
+        read -p " Masukkan Durasi (Menit): " TRIAL_MINUTES
+    fi
+    
     if [[ -z "$TRIAL_MINUTES" || ! "$TRIAL_MINUTES" =~ ^[0-9]+$ ]]; then
         TRIAL_MINUTES=30
     fi
@@ -372,10 +385,15 @@ case "$1" in
     ;;
     
   'del')
-    echo -e "\n========================================="
-    echo -e "             HAPUS AKUN UDP              "
-    echo -e "========================================="
-    read -p " Masukkan password yang ingin dihapus: " DEL_PASS
+    DEL_PASS="$2"
+    
+    if [[ -z "$DEL_PASS" ]]; then
+        echo -e "\n========================================="
+        echo -e "             HAPUS AKUN UDP              "
+        echo -e "========================================="
+        read -p " Masukkan password yang ingin dihapus: " DEL_PASS
+    fi
+    
     if ! grep -q "^$DEL_PASS|" "$DB_FILE"; then
         echo -e "\n➜ Error: Password tidak ditemukan!\n"
         exit 1
