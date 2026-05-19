@@ -3,6 +3,7 @@
 # Folder Database Sistem
 DB_DIR="/etc/z-tunnel"
 DB_FILE="$DB_DIR/database.db"
+DOMAIN_FILE="$DB_DIR/domain"
 ZIVPN_PASS_FILE="/var/lib/zivpn/passwords.txt"
 
 # Warna Terminal
@@ -20,16 +21,19 @@ if [ "$EUID" -ne 0 ]; then
 fi
 mkdir -p "$DB_DIR"
 touch "$DB_FILE"
-mkdir -p "$(dirname "$ZIVPN_PASS_FILE")"
-touch "$ZIVPN_PASS_FILE"
+touch "$DOMAIN_FILE"
+
+# Ambil data domain aktif
+if [ ! -s "$DOMAIN_FILE" ]; then
+    echo "Belum_Diatur" > "$DOMAIN_FILE"
+fi
+CURRENT_DOMAIN=$(cat "$DOMAIN_FILE")
 
 # Fungsi Sinkronisasi Database ke Biner ZiVPN
 sync_passwords() {
-    clear
-    # Mengambil hanya password yang belum expired hari ini
     today=$(date +%Y-%m-%d)
     awk -v t="$today" -F'|' '$3 >= t {print $1}' "$DB_FILE" > "$ZIVPN_PASS_FILE"
-    # Restart biner ZiVPN agar membaca password baru
+    chmod 777 "$ZIVPN_PASS_FILE"
     systemctl restart zivpn >/dev/null 2>&1
 }
 
@@ -39,13 +43,16 @@ while true; do
     echo -e "${CYAN}=========================================${NC}"
     echo -e "${GREEN}       Z-TUNNEL UDP MENU MANAGER         ${NC}"
     echo -e "${CYAN}=========================================${NC}"
+    echo -e " Domain Server : ${YELLOW}$CURRENT_DOMAIN${NC}"
+    echo -e "${CYAN}=========================================${NC}"
     echo -e " 1. Buat Akun Trial UDP (1 Hari)"
     echo -e " 2. Buat Akun Premium UDP (Manual)"
     echo -e " 3. Lihat Daftar Semua Akun (List)"
     echo -e " 4. Hapus Akun UDP"
-    echo -e " 5. Keluar"
+    echo -e " 5. Ubah Domain Server"
+    echo -e " 6. Keluar"
     echo -e "${CYAN}=========================================${NC}"
-    read -p " Pilih opsi [1-5]: " menu_choice
+    read -p " Pilih opsi [1-6]: " menu_choice
 
     case $menu_choice in
         1)
@@ -54,12 +61,12 @@ while true; do
             TRIAL_PASS=$(shuf -i 100000-999999 -n 1)
             exp_date=$(date -d "+1 day" +%Y-%m-%d)
             
-            # Simpan ke database lokal (format: password|hari|tanggal_exp)
             echo "$TRIAL_PASS|1|$exp_date" >> "$DB_FILE"
             
             echo -e "${GREEN}=========================================${NC}"
             echo -e "${GREEN}      SUKSES MEMBUAT AKUN TRIAL          ${NC}"
             echo -e "${GREEN}=========================================${NC}"
+            echo -e " Host/Domain: $CURRENT_DOMAIN"
             echo -e " Password   : $TRIAL_PASS"
             echo -e " Masa Aktif : 1 Hari"
             echo -e " Expired On : $exp_date"
@@ -81,7 +88,6 @@ while true; do
                 continue
             fi
             
-            # Cek jika password sudah ada
             if grep -q "^$PREMIUM_PASS|" "$DB_FILE"; then
                 echo -e "${RED}Error: Password sudah digunakan!${NC}"
                 sleep 2
@@ -94,6 +100,7 @@ while true; do
             echo -e "${GREEN}=========================================${NC}"
             echo -e "${GREEN}      SUKSES MEMBUAT AKUN PREMIUM        ${NC}"
             echo -e "${GREEN}=========================================${NC}"
+            echo -e " Host/Domain: $CURRENT_DOMAIN"
             echo -e " Password   : $PREMIUM_PASS"
             echo -e " Masa Aktif : $PREMIUM_DAYS Hari"
             echo -e " Expired On : $exp_date"
@@ -142,13 +149,32 @@ while true; do
                 continue
             fi
             
-            # Hapus dari database lokal
             sed -i "/^$DEL_PASS|/d" "$DB_FILE"
             echo -e "${GREEN}Akun '$DEL_PASS' berhasil dihapus dari database.${NC}"
             sleep 2
             ;;
             
         5)
+            clear
+            echo -e "${YELLOW}=========================================${NC}"
+            echo -e "${YELLOW}          UBAH DOMAIN SERVER             ${NC}"
+            echo -e "${YELLOW}=========================================${NC}"
+            echo -e " Domain Saat Ini: $CURRENT_DOMAIN"
+            read -p " Masukkan Domain Baru: " NEW_DOMAIN
+            
+            if [ -z "$NEW_DOMAIN" ]; then
+                echo -e "${RED}Error: Domain tidak boleh kosong!${NC}"
+                sleep 2
+                continue
+            fi
+            
+            echo "$NEW_DOMAIN" > "$DOMAIN_FILE"
+            CURRENT_DOMAIN="$NEW_DOMAIN"
+            echo -e "${GREEN}Domain berhasil diperbarui menjadi: $CURRENT_DOMAIN${NC}"
+            sleep 2
+            ;;
+            
+        6)
             clear
             exit 0
             ;;
