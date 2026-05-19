@@ -10,14 +10,33 @@ sleep 1
 apt-get update -y
 apt-get install curl wget shuf libc6 -y
 
-# 2. Ambil Biner Kompatibel dari Repositori Potato
+# 2. Ambil Biner Kompatibel dari Repositori Potato (Jalur Tradisional)
 echo "[*] Mengunduh biner ZiVPN versi kompatibel..."
 mkdir -p /etc/zivpn
 mkdir -p /var/lib/zivpn
 mkdir -p /etc/z-tunnel
 
-wget -q -O /usr/bin/zivpn "https://raw.githubusercontent.com/potatonc/zivpn-udp/refs/heads/main/zivpn"
-chmod +x /usr/bin/zivpn
+# Membersihkan sisa file lama jika ada
+rm -f /usr/bin/zivpn
+
+# Menggunakan URL jalur pintas murni tanpa /refs/heads/
+wget -q --no-cache -O /usr/bin/zivpn "https://raw.githubusercontent.com/potatonc/zivpn-udp/main/zivpn"
+
+# Verifikasi apakah file berhasil diunduh dan tidak kosong
+if [ ! -s /usr/bin/zivpn ] || [ $(wc -c < /usr/bin/zivpn) -lt 1000 ]; then
+    echo "[!] Jalur utama gagal, mencoba jalur alternatif 2..."
+    rm -f /usr/bin/zivpn
+    curl -k -sL "https://raw.githubusercontent.com/potatonc/zivpn-udp/main/zivpn" -o /usr/bin/zivpn
+fi
+
+# Cek final sebelum memberi izin akses
+if [ -s /usr/bin/zivpn ]; then
+    chmod +x /usr/bin/zivpn
+    echo "[+] Biner ZiVPN berhasil dipasang dengan aman."
+else
+    echo -e "\033[0;31m[-] GAGAL MENGUNDUH BINER ZIVPN! Proses dihentikan.\033[0m"
+    exit 1
+fi
 
 # 3. Buat Konfigurasi Default config.json
 cat <<EOF > /etc/zivpn/config.json
@@ -53,7 +72,7 @@ EOF
 # Jalankan Service Biner
 systemctl daemon-reload
 systemctl enable zivpn
-systemctl start zivpn
+systemctl restart zivpn
 
 # 6. Buat Skrip Otomatis Pembersih Akun Expired Harian (Cron Job)
 cat <<'EOF' > /etc/cron.daily/zivpn-cleaner
