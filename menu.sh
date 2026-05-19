@@ -9,7 +9,7 @@ while true; do
     echo -e " Domain Server : \033[0;33m$CURRENT_DOMAIN\033[0m"
     echo -e " Port Range    : \033[0;35m6000 - 19999 (UDP)\033[0m"
     echo -e "\033[0;36m=========================================\033[0m"
-    echo -e " 1. Buat Akun Trial (1 Hari)"
+    echo -e " 1. Buat Akun Trial"
     echo -e " 2. Buat Akun Premium"
     echo -e " 3. Lihat Daftar Semua Akun"
     echo -e " 4. Hapus Akun"
