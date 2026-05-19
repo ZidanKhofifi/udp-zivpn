@@ -16,10 +16,11 @@ while true; do
     echo -e " 5. Ubah Domain Server"
     echo -e " 6. Backup Database"
     echo -e " 7. Restore Database"
-    echo -e " 8. Uninstaller Script"
-    echo -e " 9. Keluar"
+    echo -e " 8. Setup API Gateway Bot"
+    echo -e " 9. Uninstaller Script"
+    echo -e " 10. Keluar"
     echo -e "\033[0;36m=========================================\033[0m"
-    read -p " Pilih opsi [1-9]: " opt
+    read -p " Pilih opsi [1-10]: " opt
 
     case $opt in
         1) bash /usr/local/bin/zi.sh trial; read -n 1 -s -r -p "Tekan enter untuk kembali...";;
@@ -29,16 +30,17 @@ while true; do
         5) bash /usr/local/bin/zi.sh domain; read -n 1 -s -r -p "Tekan enter untuk kembali...";;
         6) bash /usr/local/bin/zi.sh backup; read -n 1 -s -r -p "Tekan enter untuk kembali...";;
         7) bash /usr/local/bin/zi.sh restore; read -n 1 -s -r -p "Tekan enter untuk kembali...";;
-        8) 
+        8) bash /usr/local/bin/zi.sh api; read -n 1 -s -r -p "Tekan enter untuk kembali...";;
+        9) 
             read -p "Apakah yakin ingin hapus SC? [y/n]: " yakin
             if [[ "$yakin" == "y" || "$yakin" == "Y" ]]; then
                 bash /usr/local/bin/zi.sh uninstall
                 sed -i '/menu.sh/d' ~/.bashrc
-                rm -f /usr/local/bin/zi.sh /usr/bin/menu.sh
+                rm -f /usr/local/bin/zi.sh /usr/bin/menu.sh /usr/bin/install.sh
                 exit 0
             fi
             ;;
-        9) clear; exit 0;;
+        10) clear; exit 0;;
         *) echo "Pilihan tidak tersedia!"; sleep 1;;
     esac
 done
