@@ -78,7 +78,10 @@ EOF
 
     first=true
     while IFS='|' read -r pass days exp; do
-        if [[ -n "$pass" && "$exp" >= "$today" ]]; then
+        exp_num=$(echo "$exp" | tr -d '-')
+        today_num=$(echo "$today" | tr -d '-')
+
+        if [[ -n "$pass" && -n "$exp_num" && "$exp_num" -ge "$today_num" ]]; then
             if [ "$first" = true ]; then
                 echo "      \"$pass\"" >> "$Dir/config.json"
                 first=false
@@ -192,7 +195,15 @@ DB_FILE="/etc/z-tunnel/database.db"
 Dir="/etc/zivpn"
 today=$(date +%Y-%m-%d)
 if [ -f "$DB_FILE" ]; then
-    awk -v t="$today" -F'|' '$3 >= t {print $0}' "$DB_FILE" > "${DB_FILE}.tmp" && mv "${DB_FILE}.tmp" "$DB_FILE"
+    today_num=$(date +%Y%m%d)
+    touch "${DB_FILE}.tmp"
+    while IFS='|' read -r pass days exp; do
+        exp_num=$(echo "$exp" | tr -d '-')
+        if [[ -n "$pass" && -n "$exp_num" && "$exp_num" -ge "$today_num" ]]; then
+            echo "$pass|$days|$exp" >> "${DB_FILE}.tmp"
+        fi
+    done < "$DB_FILE"
+    mv "${DB_FILE}.tmp" "$DB_FILE"
     
     cat <<EOF2 > "$Dir/config.json"
 {
@@ -206,13 +217,11 @@ if [ -f "$DB_FILE" ]; then
 EOF2
     first=true
     while IFS='|' read -r pass days exp; do
-        if [[ -n "$pass" && "$exp" >= "$today" ]]; then
-            if [ "$first" = true ]; then
-                echo "      \"$pass\"" >> "$Dir/config.json"
-                first=false
-            else
-                echo "      ,\"$pass\"" >> "$Dir/config.json"
-            fi
+        if [ "$first" = true ]; then
+            echo "      \"$pass\"" >> "$Dir/config.json"
+            first=false
+        else
+            echo "      ,\"$pass\"" >> "$Dir/config.json"
         fi
     done < "$DB_FILE"
     cat <<EOF3 >> "$Dir/config.json"
@@ -306,7 +315,9 @@ case "$1" in
     today=$(date +%Y-%m-%d)
     while IFS='|' read -r pass days exp; do
         if [[ -n "$pass" ]]; then
-            if [[ "$exp" < "$today" ]]; then
+            exp_num=$(echo "$exp" | tr -d '-')
+            today_num=$(echo "$today" | tr -d '-')
+            if [[ "$exp_num" -lt "$today_num" ]]; then
                 printf "%-15s | %-12s | %-15s \033[0;31m(Expired)\033[0m\n" "$pass" "$days" "$exp"
             else
                 printf "%-15s | %-12s | %-15s \033[0;32m(Aktif)\033[0m\n" "$pass" "$days" "$exp"
