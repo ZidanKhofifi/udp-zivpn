@@ -135,6 +135,12 @@ Uninstall() {
   if Utils rt; then
     iptables -t nat -D PREROUTING -i $NIC -p udp --dport 6000:19999 -j DNAT --to-destination :5667
   fi
+  
+  # Hapus komponen API jika ada
+  systemctl stop z-api 2>/dev/null
+  systemctl disable z-api 2>/dev/null
+  rm -f /etc/systemd/system/z-api.service
+  rm -rf /etc/z-api
   rm -rf "$DB_DIR"
 }
 
@@ -190,7 +196,7 @@ END
     
     # Daftarkan pembersih otomatis harian (Cron Job harian)
     cat <<'EOF' > /etc/cron.daily/zivpn-cleaner
-#!/bin/bash
+#!/bash/bin
 DB_FILE="/etc/z-tunnel/database.db"
 Dir="/etc/zivpn"
 today=$(date +%Y-%m-%d)
@@ -241,9 +247,110 @@ EOF
   fi
 }
 
+SetupAPI() {
+    echo -e "\n========================================="
+    echo -e "       KONFIGURASI API GATEWAY BOT       "
+    echo -e "========================================="
+    read -p " Masukkan API Key Rahasia Anda: " USER_KEY
+    if [ -z "$USER_KEY" ]; then
+        echo -e "\n➜ Error: API Key tidak boleh kosong!\n"
+        exit 1
+    fi
+
+    echo "[*] Memeriksa komponen Node.js..."
+    if ! command -v node &> /dev/null; then
+        echo "[*] Menginstal Node.js dan npm..."
+        curl -fsSL https://deb.nodesource.com/setup_18.x | bash - &>/dev/null
+        apt-get install -y nodejs &>/dev/null
+    fi
+
+    mkdir -p /etc/z-api
+    cd /etc/z-api
+    echo "[*] Memasang library pendukung (Express)..."
+    npm init -y &>/dev/null
+    npm install express &>/dev/null
+
+    echo "[*] Membuat berkas server backend..."
+    cat > server.js <<EOF
+const express = require('express');
+const { exec } = require('child_process');
+const app = express();
+const PORT = 3000;
+const SECRET_KEY = "$USER_KEY";
+
+app.use(express.json());
+
+const authenticate = (req, res, next) => {
+    const apiKey = req.headers['x-api-key'];
+    if (apiKey && apiKey === SECRET_KEY) {
+        next();
+    } else {
+        res.status(401).json({ status: false, message: 'Unauthorized' });
+    }
+};
+
+app.post('/account', authenticate, (req, res) => {
+    const { type, password, days } = req.body;
+    if (type === 'trial') {
+        exec('bash /usr/local/bin/zi.sh trial', (err, stdout) => {
+            if (err) return res.status(500).json({ status: false, error: err.message });
+            return res.json({ status: true, message: 'Trial Created', output: stdout });
+        });
+    } else if (type === 'premium') {
+        if (!password || !days) return res.status(400).json({ status: false, message: 'Missing parameters' });
+        exec(\`printf "\${password}\n\${days}\n" | bash /usr/local/bin/zi.sh add\`, (err, stdout) => {
+            if (err) return res.status(500).json({ status: false, error: err.message });
+            return res.json({ status: true, message: 'Premium Created', output: stdout });
+        });
+    } else {
+        res.status(400).json({ status: false, message: 'Invalid type' });
+    }
+});
+
+app.delete('/account', authenticate, (req, res) => {
+    const { password } = req.body;
+    if (!password) return res.status(400).json({ status: false, message: 'Missing password' });
+    exec(\`printf "\${password}\n" | bash /usr/local/bin/zi.sh del\`, (err, stdout) => {
+        if (err) return res.status(500).json({ status: false, error: err.message });
+        return res.json({ status: true, message: 'Account Deleted', output: stdout });
+    });
+});
+
+app.listen(PORT);
+EOF
+
+    cat > /etc/systemd/system/z-api.service <<-END
+[Unit]
+Description=API Gateway Z-Tunnel
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/etc/z-api
+ExecStart=/usr/bin/node server.js
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+END
+
+    systemctl daemon-reload
+    systemctl enable z-api &>/dev/null
+    systemctl start z-api
+    
+    echo -e "\n========================================="
+    echo -e "       API GATEWAY BERHASIL AKTIF        "
+    echo -e "========================================="
+    echo -e " URL API  : http://$(wget -qO- icanhazip.com):3000"
+    echo -e " API Key  : $USER_KEY"
+    echo -e "=========================================\n"
+}
+
 case "$1" in
   'install') Install ;;
   'uninstall') Uninstall; echo -e "\n➜ Bersih total.\n" ;;
+  'api') SetupAPI ;;
   'add')
     echo -e "\n========================================="
     echo -e "           BUAT AKUN PREMIUM             "
@@ -358,6 +465,6 @@ case "$1" in
     ;;
     
   *)
-    echo -e "\n Gunakan perintah: zi.sh [install|uninstall|add|trial|del|list|domain|backup|restore]\n"
+    echo -e "\n Gunakan perintah: zi.sh [install|uninstall|api|add|trial|del|list|domain|backup|restore]\n"
     ;;
 esac
