@@ -7,7 +7,8 @@ Panduan ringkas untuk pemasangan, pembaruan, dan penghapusan sistem manajemen Zi
 # 1. PERINTAH INSTALASI (INSTALL)
 # =================================================================
 ```bash
-apt-get update -y && apt-get install curl wget -y; rm -f /usr/bin/install.sh /usr/bin/menu.sh; wget -q --no-cache -O /usr/bin/install.sh "[https://raw.githubusercontent.com/ZidanKhofifi/udp-zivpn/main/install.sh](https://raw.githubusercontent.com/ZidanKhofifi/udp-zivpn/main/install.sh)"; chmod +x /usr/bin/install.sh && bash /usr/bin/install.sh
+apt-get update -y && apt-get install curl wget -y; rm -f /usr/bin/install.sh /usr/bin/menu.sh; wget -q --no-cache -O /usr/bin/install.sh "https://raw.githubusercontent.com/ZidanKhofifi/udp-zivpn/main/install.sh"; chmod +x /usr/bin/install.sh && bash /usr/bin/install.sh
+
 ```
 # =================================================================
 # 2. PERINTAH PEMBARUAN (UPDATE)
