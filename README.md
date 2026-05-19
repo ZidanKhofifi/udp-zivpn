@@ -14,7 +14,7 @@ apt-get update -y && apt-get install curl wget -y; rm -f /usr/bin/install.sh /us
 # 2. PERINTAH PEMBARUAN (UPDATE)
 # =================================================================
 ```bash
-rm -f /usr/bin/install.sh /usr/bin/menu.sh /usr/local/bin/zi.sh; wget -q --no-cache -O /usr/bin/install.sh "[https://raw.githubusercontent.com/ZidanKhofifi/udp-zivpn/main/install.sh](https://raw.githubusercontent.com/ZidanKhofifi/udp-zivpn/main/install.sh)"; chmod +x /usr/bin/install.sh && bash /usr/bin/install.sh
+rm -f /usr/bin/install.sh /usr/bin/menu.sh /usr/local/bin/zi.sh; wget -q --no-cache -O /usr/bin/install.sh "https://raw.githubusercontent.com/ZidanKhofifi/udp-zivpn/main/install.sh"; chmod +x /usr/bin/install.sh && bash /usr/bin/install.sh
 ```
 # =================================================================
 # 3. PERINTAH PENGHAPUSAN (UNINSTALL)
