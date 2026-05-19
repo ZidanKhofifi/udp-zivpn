@@ -302,7 +302,7 @@ END
 
     systemctl daemon-reload
     systemctl enable z-api &>/dev/null
-    systemctl start z-api
+    systemctl restart z-api
     
     echo -e "\n========================================="
     echo -e "       API GATEWAY BERHASIL AKTIF        "
@@ -321,11 +321,16 @@ case "$1" in
     PREMIUM_DAYS="$3"
     
     if [[ -z "$PREMIUM_PASS" || -z "$PREMIUM_DAYS" ]]; then
-        echo -e "\n========================================="
-        echo -e "           BUAT AKUN PREMIUM             "
-        echo -e "========================================="
-        read -p " Masukkan Password : " PREMIUM_PASS
-        read -p " Masukkan Masa Aktif (Hari): " PREMIUM_DAYS
+        if [ -t 0 ]; then
+            echo -e "\n========================================="
+            echo -e "           BUAT AKUN PREMIUM             "
+            echo -e "========================================="
+            read -p " Masukkan Password : " PREMIUM_PASS
+            read -p " Masukkan Masa Aktif (Hari): " PREMIUM_DAYS
+        else
+            echo "➜ Error: Argumen tidak lengkap untuk mode non-interaktif."
+            exit 1
+        fi
     fi
     
     if [[ -z "$PREMIUM_PASS" || -z "$PREMIUM_DAYS" || ! "$PREMIUM_DAYS" =~ ^[0-9]+$ ]]; then
@@ -357,10 +362,14 @@ case "$1" in
     TRIAL_MINUTES="$2"
     
     if [[ -z "$TRIAL_MINUTES" ]]; then
-        echo -e "\n========================================="
-        echo -e "           BUAT AKUN TRIAL               "
-        echo -e "========================================="
-        read -p " Masukkan Durasi (Menit): " TRIAL_MINUTES
+        if [ -t 0 ]; then
+            echo -e "\n========================================="
+            echo -e "           BUAT AKUN TRIAL               "
+            echo -e "========================================="
+            read -p " Masukkan Durasi (Menit): " TRIAL_MINUTES
+        else
+            TRIAL_MINUTES=30
+        fi
     fi
     
     if [[ -z "$TRIAL_MINUTES" || ! "$TRIAL_MINUTES" =~ ^[0-9]+$ ]]; then
@@ -388,10 +397,15 @@ case "$1" in
     DEL_PASS="$2"
     
     if [[ -z "$DEL_PASS" ]]; then
-        echo -e "\n========================================="
-        echo -e "             HAPUS AKUN UDP              "
-        echo -e "========================================="
-        read -p " Masukkan password yang ingin dihapus: " DEL_PASS
+        if [ -t 0 ]; then
+            echo -e "\n========================================="
+            echo -e "             HAPUS AKUN UDP              "
+            echo -e "========================================="
+            read -p " Masukkan password yang ingin dihapus: " DEL_PASS
+        else
+            echo "➜ Error: Password kosong."
+            exit 1
+        fi
     fi
     
     if ! grep -q "^$DEL_PASS|" "$DB_FILE"; then
