@@ -1,254 +1,153 @@
 #!/bin/bash
 
-# Pastikan folder database ada
-mkdir -p /var/lib/zivpn
-mkdir -p /etc/z-tunnel
-touch /var/lib/zivpn/passwords.txt
+# Warna untuk tampilan terminal
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+BLUE='\033[0;34m'
+PURPLE='\033[0;35m'
+CYAN='\033[0;36m'
+NC='\033[0;3m' # No Color
 
-function menu_utama() {
-    clear
-    domain=$(cat /etc/z-tunnel/domain)
-    port_sekarang=$(grep -oP '"server_port": "\K[^"]+' /etc/zivpn/config.json)
-    
-    echo "========================================="
-    echo "       Z-TUNNEL UDP MENU MANAGER         "
-    echo "========================================="
-    echo " DOMAIN/HOST : $domain"
-    echo " PORT UDP    : $port_sekarang"
-    echo "========================================="
-    echo " [1] Buat Akun Trial Zivpn"
-    echo " [2] Buat Akun Premium Zivpn"
-    echo " [3] Lihat Daftar Semua Akun (List)"
-    echo " [4] Hapus Akun Zivpn"
-    echo " ───────────────────────────────────────"
-    echo " [5] Backup Data Akun"
-    echo " [6] Restore Data Akun"
-    echo " [7] Ubah Domain Server (Change Domain)"
-    echo " [8] Ubah Port UDP Server"
-    echo " [x] Keluar"
-    echo "========================================="
-    read -p "Pilih opsi [1-8 atau x]: " opsi
+# URL skrip inti sebagai engine utama
+ENGINE_URL="https://raw.githubusercontent.com/potatonc/zivpn-udp/refs/heads/main/zi.sh"
 
-    case $opsi in
-        1) buat_akun "trial" ;;
-        2) buat_akun "premium" ;;
-        3) lihat_daftar_akun ;;
-        4) hapus_akun ;;
-        5) backup_data ;;
-        6) restore_data ;;
-        7) ubah_domain ;;
-        8) ubah_port ;;
-        x|X) clear; exit 0 ;;
-        *) echo "Pilihan tidak tersedia!"; sleep 1; menu_utama ;;
-    esac
-}
+# Pastikan dijalankan sebagai root
+if [ "$EUID" -ne 0 ]; then
+    echo -e "${RED}Error: Silakan jalankan skrip ini sebagai root (sudo su).${NC}"
+    exit 1
+fi
 
-function buat_akun() {
-    clear
-    tipe_akun=$1
-    
-    if [[ "$tipe_akun" == "trial" ]]; then
-        echo "========================================="
-        echo "          BUAT AKUN TRIAL ZIVPN          "
-        echo "========================================="
-        password_acak="trial$((RANDOM % 90000 + 10000))"
-        # Durasi trial diset hingga akhir hari berjalan (atau ganti sesuai kebutuhan)
-        expired_time=$(date -d "tomorrow" +"%d %b %Y")
-    else
-        echo "========================================="
-        echo "         BUAT AKUN PREMIUM ZIVPN         "
-        echo "========================================="
-        read -p "Masukkan Password Khusus: " password_acak
-        if [[ -z "$password_acak" ]]; then
-            echo "Password tidak boleh kosong!"
-            sleep 1
-            menu_utama
-        fi
-        # Memastikan tidak ada spasi atau karakter aneh
-        password_acak=$(echo "$password_acak" | tr -d ' ')
+# Fungsi Tampilan Header Menu
+clear
+echo -e "${CYAN}=========================================${NC}"
+echo -e "${GREEN}       Z-TUNNEL UDP MENU MANAGER         ${NC}"
+echo -e "${CYAN}=========================================${NC}"
+echo -e " 1. Buat Akun Trial UDP (1 Hari)"
+echo -e " 2. Buat Akun Premium UDP (Manual)"
+echo -e " 3. Lihat Daftar Semua Akun (List)"
+echo -e " 4. Hapus Akun UDP"
+echo -e " 5. Backup Konfigurasi & Akun"
+echo -e " 6. Restore Konfigurasi & Akun"
+echo -e " 7. Keluar"
+echo -e "${CYAN}=========================================${NC}"
+read -p " Pilih opsi [1-7]: " menu_choice
+
+case $menu_choice in
+    1)
+        # Opsi 1: Buat Akun Trial (Otomatis & Acak)
+        clear
+        echo -e "${YELLOW}[*] Membuat Akun Trial UDP (1 Hari)...${NC}"
+        # Membuat password acak sepanjang 6 karakter (angka saja)
+        TRIAL_PASS=$(value=$(shuf -i 100000-999999 -n 1); echo "$value")
         
-        read -p "Masa Aktif Premium (Hari): " jumlah_hari
-        if ! [[ "$jumlah_hari" =~ ^[0-9]+$ ]]; then
-            echo "Harus berupa angka jumlah hari!"
-            sleep 1
-            menu_utama
+        # Eksekusi penambahan akun via engine Potato di latar belakang
+        # Menggunakan exp 1 hari secara otomatis
+        bash <(wget -qO- "$ENGINE_URL") add "$TRIAL_PASS" 1 > /dev/null 2>&1
+        
+        echo -e "${GREEN}=========================================${NC}"
+        echo -e "${GREEN}      SUKSES MEMBUAT AKUN TRIAL          ${NC}"
+        echo -e "${GREEN}=========================================${NC}"
+        echo -e " Password : $TRIAL_PASS"
+        echo -e " Masa Aktif: 1 Hari"
+        echo -e "${GREEN}=========================================${NC}"
+        read -n 1 -s -r -p "Tekan tombol apa saja untuk kembali ke menu..."
+        bash /usr/bin/menu.sh
+        ;;
+        
+    2)
+        # Opsi 2: Buat Akun Premium (Input Manual)
+        clear
+        echo -e "${YELLOW}=========================================${NC}"
+        echo -e "${YELLOW}           BUAT AKUN PREMIUM             ${NC}"
+        echo -e "${YELLOW}=========================================${NC}"
+        read -p " Masukkan Password : " PREMIUM_PASS
+        read -p " Masukkan Masa Aktif (Hari): " PREMIUM_DAYS
+        
+        if [[ -z "$PREMIUM_PASS" || -z "$PREMIUM_DAYS" ]]; then
+            echo -e "${RED}Error: Input tidak boleh kosong!${NC}"
+            sleep 2
+            bash /usr/bin/menu.sh
+            exit 1
         fi
-        expired_time=$(date -d "$jumlah_hari days" +"%d %b %Y")
-    fi
-
-    domain=$(cat /etc/z-tunnel/domain)
-    vps_isp=$(curl -s ipinfo.io/org | cut -d' ' -f2-)
-    if [[ -z "$vps_isp" ]]; then
-        vps_isp="NewMedia Express Pte Ltd"
-    fi
-
-    # Simpan ke database teks: FORMAT -> password | tanggal_expired
-    echo "$password_acak | $expired_time" >> /var/lib/zivpn/passwords.txt
-    systemctl restart zivpn &>/dev/null
-
-    clear
-    echo " _   _ ____  ____    __________     ______  _   _"
-    echo "Success:"
-    if [[ "$tipe_akun" == "trial" ]]; then
-        echo "TRIAL AKUN ZIVPN"
-    else
-        echo "PREMIUM AKUN ZIVPN"
-    fi
-    echo "┌────────────────────────┐"
-    echo "│ Host   : $domain"
-    echo "│ Pass   : $password_acak"
-    echo "│ ISP    : $vps_isp"
-    echo "│ Expire : $expired_time"
-    echo "└────────────────────────┘"
-    echo "Terima kasih telah menggunakan layanan kami"
-    echo ""
-    read -p "Tekan Enter untuk kembali ke menu..."
-    menu_utama
-}
-
-function lihat_daftar_akun() {
-    clear
-    echo "========================================="
-    echo "         DAFTAR SEMUA AKUN AKTIF         "
-    echo "========================================="
-    echo "   PASSWORD    |    EXPIRED DATE         "
-    echo "─────────────────────────────────────────"
-    if [ ! -s /var/lib/zivpn/passwords.txt ]; then
-        echo "       ( Belum ada akun terdaftar )"
-    else
-        cat /var/lib/zivpn/passwords.txt | awk -F ' \\| ' '{printf " %-13s | %-15s\n", \$1, \$2}'
-    fi
-    echo "========================================="
-    read -p "Tekan [Enter] untuk kembali ke menu..."
-    menu_utama
-}
-
-function hapus_akun() {
-    clear
-    echo "========================================="
-    echo "            HAPUS AKUN ZIVPN             "
-    echo "========================================="
-    read -p "Masukkan Password yang ingin dihapus: " pass_hapus
-    
-    if [[ -z "$pass_hapus" ]]; then
-        menu_utama
-    fi
-
-    if grep -q "^$pass_hapus " /var/lib/zivpn/passwords.txt || grep -q "^$pass_hapus$" /var/lib/zivpn/passwords.txt; then
-        sed -i "/^$pass_hapus /d" /var/lib/zivpn/passwords.txt
-        sed -i "/^$pass_hapus$/d" /var/lib/zivpn/passwords.txt
-        systemctl restart zivpn &>/dev/null
+        
+        # Eksekusi penambahan akun via engine Potato
+        bash <(wget -qO- "$ENGINE_URL") add "$PREMIUM_PASS" "$PREMIUM_DAYS" > /dev/null 2>&1
+        
+        echo -e "${GREEN}=========================================${NC}"
+        echo -e "${GREEN}      SUKSES MEMBUAT AKUN PREMIUM        ${NC}"
+        echo -e "${GREEN}=========================================${NC}"
+        echo -e " Password : $PREMIUM_PASS"
+        echo -e " Masa Aktif: $PREMIUM_DAYS Hari"
+        echo -e "${GREEN}=========================================${NC}"
+        read -n 1 -s -r -p "Tekan tombol apa saja untuk kembali ke menu..."
+        bash /usr/bin/menu.sh
+        ;;
+        
+    3)
+        # Opsi 3: List Akun
+        clear
+        echo -e "${GREEN}[*] Menampilkan Daftar Akun Aktif:${NC}"
+        bash <(wget -qO- "$ENGINE_URL") list
         echo ""
-        echo "Akun dengan password '$pass_hapus' berhasil dihapus!"
-    else
+        read -n 1 -s -r -p "Tekan tombol apa saja untuk kembali ke menu..."
+        bash /usr/bin/menu.sh
+        ;;
+        
+    4)
+        # Opsi 4: Hapus Akun
+        clear
+        echo -e "${RED}=========================================${NC}"
+        echo -e "${RED}             HAPUS AKUN UDP              ${NC}"
+        echo -e "${RED}=========================================${NC}"
+        read -p " Masukkan password yang ingin dihapus: " DEL_PASS
+        
+        if [ -z "$DEL_PASS" ]; then
+            echo -e "${RED}Error: Password tidak boleh kosong!${NC}"
+            sleep 2
+            bash /usr/bin/menu.sh
+            exit 1
+        fi
+        
+        # Eksekusi hapus akun via engine Potato
+        bash <(wget -qO- "$ENGINE_URL") del "$DEL_PASS"
+        
+        echo -e "${GREEN}Proses penghapusan akun '$DEL_PASS' selesai.${NC}"
+        sleep 2
+        bash /usr/bin/menu.sh
+        ;;
+        
+    5)
+        # Opsi 5: Backup Konfigurasi
+        clear
+        echo -e "${YELLOW}[*] Memulai Proses Backup Konfigurasi...${NC}"
+        bash <(wget -qO- "$ENGINE_URL") backup
         echo ""
-        echo "Password tidak ditemukan di database!"
-    fi
-    sleep 2
-    menu_utama
-}
-
-function backup_data() {
-    clear
-    echo "========================================="
-    echo "            BACKUP DATA AKUN             "
-    echo "========================================="
-    echo "[+] Mengompres data database..."
-    sleep 1
-    
-    mkdir -p /root/zivpn_backup
-    cp /var/lib/zivpn/passwords.txt /root/zivpn_backup/
-    cp /etc/zivpn/config.json /root/zivpn_backup/
-    cp /etc/z-tunnel/domain /root/zivpn_backup/
-    
-    cd /root
-    tar -czf zivpn-backup.tar.gz zivpn_backup
-    rm -rf /root/zivpn_backup
-    
-    mv zivpn-backup.tar.gz /root/backup_zivpn.tar.gz
-    
-    echo "========================================="
-    echo " BACKUP SELESAI!"
-    echo " File disimpan di: /root/backup_zivpn.tar.gz"
-    echo " Silakan unduh file tersebut ke HP Anda."
-    echo "========================================="
-    read -p "Tekan [Enter] untuk kembali..."
-    menu_utama
-}
-
-function restore_data() {
-    clear
-    echo "========================================="
-    echo "            RESTORE DATA AKUN            "
-    echo "========================================="
-    if [ ! -f /root/backup_zivpn.tar.gz ]; then
-        echo "Error: File /root/backup_zivpn.tar.gz tidak ditemukan!"
-        echo "Pastikan file backup sudah diunggah ke folder /root/"
-        sleep 3
-        menu_utama
-    fi
-
-    echo "[+] Memulihkan data konfigurasi dan database..."
-    cd /root
-    tar -xzf backup_zivpn.tar.gz
-    
-    cp zivpn_backup/passwords.txt /var/lib/zivpn/
-    cp zivpn_backup/config.json /etc/zivpn/
-    cp zivpn_backup/domain /etc/z-tunnel/
-    
-    rm -rf zivpn_backup
-    systemctl restart zivpn &>/dev/null
-    
-    echo "========================================="
-    echo " RESTORE SELESAI! Semua data telah pulih."
-    echo "========================================="
-    sleep 2
-    menu_utama
-}
-
-function ubah_domain() {
-    clear
-    echo "========================================="
-    echo "         UBAH DOMAIN / HOST SERVER       "
-    echo "========================================="
-    echo " Domain saat ini: $(cat /etc/z-tunnel/domain)"
-    echo "─────────────────────────────────────────"
-    read -p "Masukkan Domain Baru Anda: " domain_baru
-    
-    if [[ -z "$domain_baru" ]]; then
-        echo "Domain tidak boleh kosong!"
+        read -n 1 -s -r -p "Tekan tombol apa saja untuk kembali ke menu..."
+        bash /usr/bin/menu.sh
+        ;;
+        
+    6)
+        # Opsi 6: Restore Konfigurasi
+        clear
+        echo -e "${YELLOW}[*] Memulai Proses Restore Konfigurasi...${NC}"
+        bash <(wget -qO- "$ENGINE_URL") restore
+        echo ""
+        read -n 1 -s -r -p "Tekan tombol apa saja untuk kembali ke menu..."
+        bash /usr/bin/menu.sh
+        ;;
+        
+    7)
+        # Opsi 7: Keluar
+        clear
+        echo -e "${GREEN}Terima kasih telah menggunakan Z-Tunnel Manager!${NC}"
+        exit 0
+        ;;
+        
+    *)
+        # Input Salah
+        echo -e "${RED}Pilihan tidak tersedia!${NC}"
         sleep 1
-        menu_utama
-    fi
-
-    echo "$domain_baru" > /etc/z-tunnel/domain
-    echo ""
-    echo "Domain berhasil diperbarui menjadi: $domain_baru"
-    sleep 2
-    menu_utama
-}
-
-function ubah_port() {
-    clear
-    echo "========================================="
-    echo "            UBAH PORT UDP SERVER         "
-    echo "========================================="
-    echo " Port saat ini: $(grep -oP '"server_port": "\K[^"]+' /etc/zivpn/config.json)"
-    echo "─────────────────────────────────────────"
-    read -p "Masukkan Port Baru (Contoh: 5600): " port_baru
-    
-    if [[ -z "$port_baru" ]]; then
-        menu_utama
-    fi
-
-    sed -i 's/"server_port": "[^"]*"/"server_port": "'"$port_baru"'"/g' /etc/zivpn/config.json
-    systemctl restart zivpn
-    
-    echo ""
-    echo "Port berhasil diubah ke $port_baru dan layanan dimuat ulang."
-    sleep 2
-    menu_utama
-}
-
-# Eksekusi Awal Menu
-menu_utama
+        bash /usr/bin/menu.sh
+        ;;
+esac
