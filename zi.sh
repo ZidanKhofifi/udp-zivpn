@@ -469,4 +469,3 @@ case "$1" in
     ;;
 esac
 
-ini isi zi.sh saya apakah sudah benar?
