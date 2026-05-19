@@ -344,7 +344,8 @@ case "$1" in
     
     exp_date=$(date -d "+$PREMIUM_DAYS days" +%s)
     readable_exp=$(date -d "@$exp_date" "+%Y-%m-%d %H:%M:%S")
-    echo "$PREMIUM_PASS|$PREMIUM_DAYS|$exp_date" >> "$DB_FILE"
+    # MENYIMPAN SATUAN "Hari" LANGSUNG DI DATABASE
+    echo "$PREMIUM_PASS|$PREMIUM_DAYS Hari|$exp_date" >> "$DB_FILE"
     sync_to_zivpn_json
     
     echo -e "\n========================================="
@@ -379,7 +380,8 @@ case "$1" in
     TRIAL_PASS=$(shuf -i 100000-999999 -n 1)
     exp_date=$(date -d "+$TRIAL_MINUTES minutes" +%s)
     readable_exp=$(date -d "@$exp_date" "+%Y-%m-%d %H:%M:%S")
-    echo "$TRIAL_PASS|$TRIAL_MINUTES|$exp_date" >> "$DB_FILE"
+    # MENYIMPAN SATUAN "Menit" LANGSUNG DI DATABASE
+    echo "$TRIAL_PASS|$TRIAL_MINUTES Menit|$exp_date" >> "$DB_FILE"
     sync_to_zivpn_json
     
     echo -e "\n========================================="
