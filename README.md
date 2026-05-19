@@ -20,13 +20,13 @@ Skrip manajemen otomatis untuk mengelola biner asli **ZiVPN UDP Server** berbasi
 
 ---
 
-## 🚀 INSTALL SCRIPT 🚀
+## ⚠️ INSTALL SCRIPT ⚠️
 
-Masuk ke VPS baru via Termux/SSH, lalu salin dan tempel perintah di bawah ini secara langsung:
+Masuk ke VPS baru via Termux/SSH, lalu salin dan jalankan perintah di bawah ini:
 
-apt update && apt install wget -y && wget -O /usr/bin/install.sh "https://raw.githubusercontent.com/ZidanKhofifi/udp-zivpn/main/install.sh" && wget -O /usr/bin/menu.sh "https://raw.githubusercontent.com/ZidanKhofifi/udp-zivpn/main/menu.sh" && chmod +x /usr/bin/install.sh /usr/bin/menu.sh && install.sh
+wget -q -O /usr/bin/install.sh "https://raw.githubusercontent.com/ZidanKhofifi/udp-zivpn/main/install.sh" && wget -q -O /usr/bin/menu.sh "https://raw.githubusercontent.com/ZidanKhofifi/udp-zivpn/main/menu.sh" && chmod +x /usr/bin/install.sh /usr/bin/menu.sh && install.sh
 
-*Tunggu hingga proses kompilasi selesai. Setelah sukses, skrip akan **otomatis langsung membuka menu utama** tanpa perlu mengetik apa pun lagi.*
+*Tunggu hingga proses kompilasi selesai. Setelah sukses, skrip akan **otomatis langsung membuka menu utama**.*
 
 ---
 
