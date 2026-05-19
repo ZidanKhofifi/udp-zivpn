@@ -94,5 +94,13 @@ chmod +x /etc/cron.daily/zivpn-cleaner
 systemctl restart cron
 
 echo "========================================="
-echo "   INSTALL SELESAI! SILAKAN PASANG MENU  "
+echo "   INSTALL SELESAI! MEMBUKA MENU...      "
 echo "========================================="
+sleep 2
+
+# Otomatis langsung mengeksekusi menu setelah install selesai
+if [ -f /usr/bin/menu.sh ]; then
+    bash /usr/bin/menu.sh
+else
+    echo "File menu.sh tidak ditemukan di /usr/bin/"
+fi
