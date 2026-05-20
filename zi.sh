@@ -264,12 +264,19 @@ app.get('/status', authenticate, (req, res) => {
 });
 
 app.post('/restart', authenticate, (req, res) => {
-    // Memberikan respon sukses terlebih dahulu, lalu memicu proses restart di latar belakang
-    res.json({ status: true, message: 'Services restart initiated' });
+    // Kirim respons sukses ke bot WhatsApp terlebih dahulu
+    res.json({ status: true, message: 'Restart process initiated successfully' });
     
-    exec('bash /usr/local/bin/zi.sh restart-bg', (err) => {
-        if (err) console.error('Gagal memicu restart latar belakang:', err.message);
+    // Restart zivpn secara langsung
+    exec('systemctl restart zivpn', (err) => {
+        if (err) console.error('Gagal restart zivpn:', err.message);
     });
+
+    // Keluar dari proses Node setelah 1 detik agar respons HTTP selesai terkirim.
+    // Systemd dengan "Restart=always" akan otomatis menghidupkannya kembali dengan instan.
+    setTimeout(() => {
+        process.exit(0);
+    }, 1000);
 });
 
 app.post('/update', authenticate, (req, res) => {
@@ -529,17 +536,6 @@ case "$1" in
     echo "Done"
     ;;
 
-  'restart-bg')
-    # Jalankan restart di sub-shell dengan delay agar API sempat membalas request HTTP bot
-    (
-        sleep 1
-        systemctl restart zivpn >/dev/null 2>&1
-        sleep 1
-        systemctl restart z-api >/dev/null 2>&1
-    ) &
-    echo "Done-BG"
-    ;;
-
   'update')
     echo "[*] Memulai pembaruan otomatis..."
     sync_to_zivpn_json
@@ -549,6 +545,6 @@ case "$1" in
     ;;
     
   *)
-    echo -e "\n Gunakan perintah: zi.sh [install|uninstall|api|add|trial|del|list|domain|backup|restore|clean|status|restart|restart-bg|update]\n"
+    echo -e "\n Gunakan perintah: zi.sh [install|uninstall|api|add|trial|del|list|domain|backup|restore|clean|status|restart|update]\n"
     ;;
 esac
