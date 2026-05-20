@@ -264,9 +264,11 @@ app.get('/status', authenticate, (req, res) => {
 });
 
 app.post('/restart', authenticate, (req, res) => {
-    exec('bash /usr/local/bin/zi.sh restart', (err, stdout) => {
-        if (err) return res.status(500).json({ status: false, message: 'Gagal restart service' });
-        return res.json({ status: true, message: 'Services restarted successfully' });
+    // Memberikan respon sukses terlebih dahulu, lalu memicu proses restart di latar belakang
+    res.json({ status: true, message: 'Services restart initiated' });
+    
+    exec('bash /usr/local/bin/zi.sh restart-bg', (err) => {
+        if (err) console.error('Gagal memicu restart latar belakang:', err.message);
     });
 });
 
@@ -520,21 +522,26 @@ case "$1" in
     fi
     echo "ZIVPN_STAT:$ZIVPN_STAT|Z_API_STAT:$Z_API_STAT"
     ;;
-    
+
   'restart')
     systemctl restart zivpn >/dev/null 2>&1
     systemctl restart z-api >/dev/null 2>&1
     echo "Done"
     ;;
 
+  'restart-bg')
+    # Jalankan restart di sub-shell dengan delay agar API sempat membalas request HTTP bot
+    (
+        sleep 1
+        systemctl restart zivpn >/dev/null 2>&1
+        sleep 1
+        systemctl restart z-api >/dev/null 2>&1
+    ) &
+    echo "Done-BG"
+    ;;
+
   'update')
     echo "[*] Memulai pembaruan otomatis..."
-    # Contoh tautan repositori pembaruan (Dapat disesuaikan jika menggunakan GitHub)
-    # wget -qO /usr/local/bin/zi.sh "https://raw.githubusercontent.com/username/repo/main/zi.sh"
-    # wget -qO /usr/bin/menu.sh "https://raw.githubusercontent.com/username/repo/main/menu.sh"
-    # chmod +x /usr/local/bin/zi.sh /usr/bin/menu.sh
-    
-    # Membangun ulang konfigurasi database dan melakukan restart
     sync_to_zivpn_json
     systemctl restart zivpn >/dev/null 2>&1
     systemctl restart z-api >/dev/null 2>&1
@@ -542,6 +549,6 @@ case "$1" in
     ;;
     
   *)
-    echo -e "\n Gunakan perintah: zi.sh [install|uninstall|api|add|trial|del|list|domain|backup|restore|clean|status|restart|update]\n"
+    echo -e "\n Gunakan perintah: zi.sh [install|uninstall|api|add|trial|del|list|domain|backup|restore|clean|status|restart|restart-bg|update]\n"
     ;;
 esac
