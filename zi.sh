@@ -520,7 +520,7 @@ case "$1" in
     fi
     echo "ZIVPN_STAT:$ZIVPN_STAT|Z_API_STAT:$Z_API_STAT"
     ;;
-
+    
   'restart')
     systemctl restart zivpn >/dev/null 2>&1
     systemctl restart z-api >/dev/null 2>&1
