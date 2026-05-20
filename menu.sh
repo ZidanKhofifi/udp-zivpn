@@ -1,16 +1,13 @@
 #!/bin/bash
-Kode Warna ANSI untuk visualisasi
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[0;33m'
 CYAN='\033[0;36m'
 MAGENTA='\033[0;35m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 REBOOT_CRON_FILE="/etc/cron.d/vps-reboot"
-Fungsi untuk mengecek status Auto Reboot
 check_auto_reboot() {
 if [ -f "REBOOT_CRON_FILE" ]; then
-# Mengambil info jam eksekusi cron
 local cron_time=(cat "REBOOT_CRON_FILE" | grep -v "#" | head -n 1 | awk '{print $2":"$1}')
 if [ -n "$cron_time" ]; then
 echo -e "${GREEN}Aktif ($cron_time)${NC}"
@@ -21,7 +18,6 @@ else
 echo -e "{RED}Nonaktif${NC}"
 fi
 }
-Fungsi untuk mengatur Auto Reboot
 configure_auto_reboot() {
 clear
 echo -e "{CYAN}========================================={NC}"
@@ -35,9 +31,8 @@ echo -e "{CYAN}=========================================${NC}"
 read -p " Pilih opsi [1-3]: " arb_opt
 case $arb_opt in
 1)
-read -p " Masukkan jam reboot (format 24 jam, contoh: 05 untuk jam 5 pagi): " hour
+read -p " Masukkan jam reboot (format 24 jam, contoh: 05): " hour
 read -p " Masukkan menit reboot (contoh: 00): " minute
-# Validasi input
 if [[ "hour" =~ ^[0-9]+ && "minute" =~ ^[0-9]+ && "hour" -le 23 && "$minute" -le 59 ]]; then
 echo "$minute $hour * * * root /sbin/reboot" > "$REBOOT_CRON_FILE"
 chmod 644 "$REBOOT_CRON_FILE"
@@ -70,7 +65,6 @@ esac
 while true; do
 clear
 CURRENT_DOMAIN=$(cat /etc/z-tunnel/domain 2>/dev/null || echo "Belum_Diatur")
-# Deteksi Status Layanan VPS secara dinamis
 if systemctl is-active --quiet zivpn; then
 ZIVPN_STATUS="{GREEN}Active{NC}"
 else
