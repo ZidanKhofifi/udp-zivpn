@@ -162,7 +162,7 @@ Install() {
   Certificate
   sync_to_zivpn_json
 
-  # Buat berkas Systemd Service
+  # Buat berkas Systemd Service (Dengan fitur AUTO-RESTART aktif)
   cat > /etc/systemd/system/zivpn.service <<-END
 [Unit]
 Description=zivpn VPN Server Premium Mod
@@ -253,6 +253,23 @@ app.get('/list', authenticate, (req, res) => {
     });
 });
 
+app.get('/status', authenticate, (req, res) => {
+    exec('bash /usr/local/bin/zi.sh status', (err, stdout) => {
+        if (err) return res.status(500).json({ status: false, message: 'Gagal ambil status' });
+        const parts = stdout.trim().split('|');
+        const zivpn = parts[0] ? parts[0].split(':')[1] : 'Inactive';
+        const zapi = parts[1] ? parts[1].split(':')[1] : 'Inactive';
+        return res.json({ status: true, zivpn, zapi });
+    });
+});
+
+app.post('/restart', authenticate, (req, res) => {
+    exec('bash /usr/local/bin/zi.sh restart', (err, stdout) => {
+        if (err) return res.status(500).json({ status: false, message: 'Gagal restart service' });
+        return res.json({ status: true, message: 'Services restarted successfully' });
+    });
+});
+
 app.post('/account', authenticate, (req, res) => {
     const { type, password, days, minutes } = req.body;
     if (type === 'trial') {
@@ -284,6 +301,7 @@ app.delete('/account', authenticate, (req, res) => {
 app.listen(PORT);
 EOF
 
+    # Buat berkas Systemd Service API (Dengan fitur AUTO-RESTART aktif)
     cat > /etc/systemd/system/z-api.service <<-END
 [Unit]
 Description=API Gateway Z-Tunnel
@@ -295,6 +313,7 @@ User=root
 WorkingDirectory=/etc/z-api
 ExecStart=/usr/bin/node server.js
 Restart=always
+RestartSec=3
 
 [Install]
 WantedBy=multi-user.target
@@ -344,7 +363,6 @@ case "$1" in
     
     exp_date=$(date -d "+$PREMIUM_DAYS days" +%s)
     readable_exp=$(date -d "@$exp_date" "+%Y-%m-%d %H:%M:%S")
-    # MENYIMPAN SATUAN "Hari" LANGSUNG DI DATABASE
     echo "$PREMIUM_PASS|$PREMIUM_DAYS Hari|$exp_date" >> "$DB_FILE"
     sync_to_zivpn_json
     
@@ -380,7 +398,6 @@ case "$1" in
     TRIAL_PASS=$(shuf -i 100000-999999 -n 1)
     exp_date=$(date -d "+$TRIAL_MINUTES minutes" +%s)
     readable_exp=$(date -d "@$exp_date" "+%Y-%m-%d %H:%M:%S")
-    # MENYIMPAN SATUAN "Menit" LANGSUNG DI DATABASE
     echo "$TRIAL_PASS|$TRIAL_MINUTES Menit|$exp_date" >> "$DB_FILE"
     sync_to_zivpn_json
     
@@ -482,8 +499,28 @@ case "$1" in
         sync_to_zivpn_json
     fi
     ;;
+
+  'status')
+    if systemctl is-active --quiet zivpn; then
+        ZIVPN_STAT="Active"
+    else
+        ZIVPN_STAT="Inactive"
+    fi
+    if systemctl is-active --quiet z-api; then
+        Z_API_STAT="Active"
+    else
+        Z_API_STAT="Inactive"
+    fi
+    echo "ZIVPN_STAT:$ZIVPN_STAT|Z_API_STAT:$Z_API_STAT"
+    ;;
+
+  'restart')
+    systemctl restart zivpn >/dev/null 2>&1
+    systemctl restart z-api >/dev/null 2>&1
+    echo "Done"
+    ;;
     
   *)
-    echo -e "\n Gunakan perintah: zi.sh [install|uninstall|api|add|trial|del|list|domain|backup|restore|clean]\n"
+    echo -e "\n Gunakan perintah: zi.sh [install|uninstall|api|add|trial|del|list|domain|backup|restore|clean|status|restart]\n"
     ;;
 esac
