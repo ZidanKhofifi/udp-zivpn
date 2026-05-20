@@ -270,6 +270,13 @@ app.post('/restart', authenticate, (req, res) => {
     });
 });
 
+app.post('/update', authenticate, (req, res) => {
+    exec('bash /usr/local/bin/zi.sh update', (err, stdout) => {
+        if (err) return res.status(500).json({ status: false, message: 'Gagal update service' });
+        return res.json({ status: true, message: 'Update completed successfully', output: stdout });
+    });
+});
+
 app.post('/account', authenticate, (req, res) => {
     const { type, password, days, minutes } = req.body;
     if (type === 'trial') {
@@ -519,8 +526,22 @@ case "$1" in
     systemctl restart z-api >/dev/null 2>&1
     echo "Done"
     ;;
+
+  'update')
+    echo "[*] Memulai pembaruan otomatis..."
+    # Contoh tautan repositori pembaruan (Dapat disesuaikan jika menggunakan GitHub)
+    # wget -qO /usr/local/bin/zi.sh "https://raw.githubusercontent.com/username/repo/main/zi.sh"
+    # wget -qO /usr/bin/menu.sh "https://raw.githubusercontent.com/username/repo/main/menu.sh"
+    # chmod +x /usr/local/bin/zi.sh /usr/bin/menu.sh
+    
+    # Membangun ulang konfigurasi database dan melakukan restart
+    sync_to_zivpn_json
+    systemctl restart zivpn >/dev/null 2>&1
+    systemctl restart z-api >/dev/null 2>&1
+    echo "Layanan berhasil diperbarui dan dijalankan ulang."
+    ;;
     
   *)
-    echo -e "\n Gunakan perintah: zi.sh [install|uninstall|api|add|trial|del|list|domain|backup|restore|clean|status|restart]\n"
+    echo -e "\n Gunakan perintah: zi.sh [install|uninstall|api|add|trial|del|list|domain|backup|restore|clean|status|restart|update]\n"
     ;;
 esac
