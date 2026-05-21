@@ -139,7 +139,10 @@ while true; do
             echo -e "${CYAN}=========================================${NC}"
             read -p " Masukkan Password : " RENEW_PASS
             read -p " Masukkan Masa Aktif (Hari): " RENEW_DAYS
-            bash /usr/local/bin/zi.sh renew "$RENEW_PASS" "$RENEW_DAYS"
+            
+            # Eksekusi dan menangkap respon error jika akun adalah trial
+            renew_output=$(bash /usr/local/bin/zi.sh renew "$RENEW_PASS" "$RENEW_DAYS" 2>&1)
+            echo -e "$renew_output"
             read -n 1 -s -r -p "Tekan enter untuk kembali..."
             ;;
         6) 
