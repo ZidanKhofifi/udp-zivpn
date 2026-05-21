@@ -1,3 +1,4 @@
+```bash
 #!/bin/bash
 # Modul ZiVPN UDP - Versi Premium Modifikasi
 # Mesin Inti oleh Zahid Islam & Potato
@@ -35,7 +36,7 @@ Machine() {
       'amd64' | 'x86_64') MACHINE='amd64' ;;
       'armv5tel') MACHINE='arm' ;;
       'armv8' | 'aarch64') MACHINE='arm64' ;;
-      *) MACHINE='amd64' ;; # Default ke amd64 jika arsitektur tidak spesifik
+      *) MACHINE='amd64' ;;
     esac
   else
     MACHINE='amd64'
@@ -158,11 +159,9 @@ Install() {
   mkdir -p $Dir
   echo "[*] Mengunduh biner resmi ZiVPN v1.4.9 ($MACHINE)..."
   
-  # Penghapusan file lama jika rusak sebelum mengunduh yang baru
   rm -f /usr/local/bin/zivpn
   wget -q --timeout=15 --tries=3 "https://github.com/zahidbd2/udp-zivpn/releases/download/udp-zivpn_1.4.9/udp-zivpn-linux-$MACHINE" -O /usr/local/bin/zivpn
   
-  # Validasi pengaman: Jika unduhan gagal, buat biner darurat atau pakai lokal biner cadangan
   if [ ! -s "/usr/local/bin/zivpn" ]; then
       echo "[-] Unduhan biner gagal, mencoba link alternatif..."
       wget -q "https://github.com/zahidbd2/udp-zivpn/releases/download/udp-zivpn_1.4.9/udp-zivpn-linux-amd64" -O /usr/local/bin/zivpn
@@ -444,7 +443,6 @@ case "$1" in
     
     today_epoch=$(date +%s)
     
-    # Ekstrak angka durasi lama untuk kalkulasi akumulatif
     old_days_count=$(echo "$old_duration" | grep -o -E '[0-9]+')
     if [[ -z "$old_days_count" || ! "$old_days_count" =~ ^[0-9]+$ ]]; then
         old_days_count=0
@@ -452,11 +450,9 @@ case "$1" in
     
     added_seconds=$((RENEW_DAYS * 86400))
     if [[ -n "$old_exp" && "$old_exp" =~ ^[0-9]+$ && "$old_exp" -gt "$today_epoch" ]]; then
-        # Jika masih aktif: akumulasikan tanggal expired dan akumulasikan juga teks info durasi harian
         new_exp=$((old_exp + added_seconds))
         new_duration_display="$((old_days_count + RENEW_DAYS)) Hari"
     else
-        # Jika sudah expired: hitung baru dari sekarang, durasi harian hanya menggunakan durasi input baru
         new_exp=$((today_epoch + added_seconds))
         new_duration_display="${RENEW_DAYS} Hari"
     fi
@@ -577,23 +573,70 @@ case "$1" in
     ;;
     
   'backup')
+    # Sistem Pencadangan Berbasis Cloud Upload Instan (Menggunakan File.io)
     if [ -f "$DB_FILE" ]; then
-        cp "$DB_FILE" "$FileBackup"
-        cp "$DOMAIN_FILE" "${FileBackup}.domain"
-        echo -e "\n➜ Cadangan disimpan di $FileBackup\n"
+        echo "[*] Mengompresi basis data dan konfigurasi..."
+        ZIP_FILE="/tmp/ztunnel_backup.tar.gz"
+        tar -czf "$ZIP_FILE" -C "$DB_DIR" .
+        
+        echo "[*] Mengunggah cadangan secara aman..."
+        # Unggah menggunakan curl ke file.io (tautan otomatis kedaluwarsa setelah diunduh atau dalam 14 hari)
+        upload_response=$(curl -s -F "file=@$ZIP_FILE" https://file.io)
+        download_link=$(echo "$upload_response" | grep -oP '(?<="link":")[^"]*')
+        
+        rm -f "$ZIP_FILE"
+        
+        if [ -n "$download_link" ]; then
+            echo -e "\n========================================="
+            echo -e "         SISTEM PENCADANGAN BERHASIL     "
+            echo -e "========================================="
+            echo -e " Salin tautan pencadangan bapak di bawah:"
+            echo -e " Tautan: \033[0;32m$download_link\033[0m"
+            echo -e "-----------------------------------------"
+            echo -e " Tautan hanya dapat diunduh 1 kali saja."
+            echo -e " Jaga kerahasiaan tautan cadangan ini!"
+            echo -e "=========================================\n"
+        else
+                # Fallback penyimpanan lokal jika upload internet gagal
+            cp "$DB_FILE" "$FileBackup"
+            cp "$DOMAIN_FILE" "${FileBackup}.domain"
+            echo -e "\n➜ Unggahan gagal. Cadangan disimpan lokal di: $FileBackup\n"
+        fi
     else
-        echo -e "\n➜ Database kosong.\n"
+        echo -e "\n➜ Database tidak ditemukan untuk dicadangkan.\n"
     fi
     ;;
     
   'restore')
-    if [ -f "$FileBackup" ]; then
-        cp "$FileBackup" "$DB_FILE"
-        cp "${FileBackup}.domain" "$DOMAIN_FILE"
-        sync_to_zivpn_json
-        echo -e "\n➜ Berhasil memulihkan data cadangan.\n"
+    # Sistem Pemulihan Menggunakan Tautan
+    read -p " Masukkan Tautan / Link Cadangan Bapak: " RESTORE_URL
+    if [ -z "$RESTORE_URL" ]; then
+        # Jika kosong, tawarkan pemulihan cadangan lokal
+        if [ -f "$FileBackup" ]; then
+            cp "$FileBackup" "$DB_FILE"
+            cp "${FileBackup}.domain" "$DOMAIN_FILE"
+            sync_to_zivpn_json
+            echo -e "\n➜ Berhasil memulihkan dari cadangan lokal.\n"
+        else
+            echo -e "\n➜ Error: Tautan tidak boleh kosong.\n"
+        fi
     else
-        echo -e "\n➜ Berkas cadangan tidak ditemukan.\n"
+        echo "[*] Mengunduh data cadangan dari tautan..."
+        TEMP_DOWNLOAD="/tmp/ztunnel_restore.tar.gz"
+        wget -qO "$TEMP_DOWNLOAD" "$RESTORE_URL"
+        
+        if [ -s "$TEMP_DOWNLOAD" ] && file "$TEMP_DOWNLOAD" | grep -q "gzip"; then
+            echo "[*] Memulihkan database ke sistem..."
+            tar -xzf "$TEMP_DOWNLOAD" -C "$DB_DIR"
+            rm -f "$TEMP_DOWNLOAD"
+            
+            # Merakit ulang berkas konfigurasi ZiVPN
+            sync_to_zivpn_json
+            echo -e "\n➜ Pemulihan sistem berhasil diselesaikan!\n"
+        else
+            rm -f "$TEMP_DOWNLOAD"
+            echo -e "\n➜ Error: Tautan tidak valid atau data rusak.\n"
+        fi
     fi
     ;;
 

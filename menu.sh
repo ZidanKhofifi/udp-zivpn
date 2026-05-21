@@ -103,8 +103,8 @@ while true; do
     echo -e " [5]  Perpanjang Akun (Renew)"
     echo -e " [6]  Hapus Semua Akun Expired"
     echo -e " [7]  Ubah Domain Server"
-    echo -e " [8]  Backup Database"
-    echo -e " [9]  Restore Database"
+    echo -e " [8]  Backup Database (Upload Link)"
+    echo -e " [9]  Restore Database (Paste Link)"
     echo -e " [10] Setup API Gateway Bot"
     echo -e " [11] Restart Semua Layanan VPS"
     echo -e " [12] Atur Auto Reboot VPS"
@@ -140,7 +140,6 @@ while true; do
             read -p " Masukkan Password : " RENEW_PASS
             read -p " Masukkan Masa Aktif (Hari): " RENEW_DAYS
             
-            # Eksekusi dan menangkap respon error jika akun adalah trial
             renew_output=$(bash /usr/local/bin/zi.sh renew "$RENEW_PASS" "$RENEW_DAYS" 2>&1)
             echo -e "$renew_output"
             read -n 1 -s -r -p "Tekan enter untuk kembali..."
@@ -151,8 +150,16 @@ while true; do
             read -n 1 -s -r -p "Tekan enter untuk kembali..."
             ;;
         7) bash /usr/local/bin/zi.sh domain; read -n 1 -s -r -p "Tekan enter untuk kembali...";;
-        8) bash /usr/local/bin/zi.sh backup; read -n 1 -s -r -p "Tekan enter untuk kembali...";;
-        9) bash /usr/local/bin/zi.sh restore; read -n 1 -s -r -p "Tekan enter untuk kembali...";;
+        8) 
+            clear
+            bash /usr/local/bin/zi.sh backup
+            read -n 1 -s -r -p "Tekan enter untuk kembali..."
+            ;;
+        9) 
+            clear
+            bash /usr/local/bin/zi.sh restore
+            read -n 1 -s -r -p "Tekan enter untuk kembali..."
+            ;;
         10) bash /usr/local/bin/zi.sh api; read -n 1 -s -r -p "Tekan enter untuk kembali...";;
         11) 
             echo -e "\n⏳ Sedang melakukan restart layanan..."
