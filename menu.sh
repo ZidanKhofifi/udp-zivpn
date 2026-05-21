@@ -118,11 +118,25 @@ while true; do
         1) bash /usr/local/bin/zi.sh trial; read -n 1 -s -r -p "Tekan enter untuk kembali...";;
         2) bash /usr/local/bin/zi.sh add; read -n 1 -s -r -p "Tekan enter untuk kembali...";;
         3) bash /usr/local/bin/zi.sh list; read -n 1 -s -r -p "Tekan enter untuk kembali...";;
-        4) bash /usr/local/bin/zi.sh del; read -n 1 -s -r -p "Tekan enter untuk kembali...";;
+        4)
+            clear
+            echo -e "${CYAN}=========================================${NC}"
+            echo -e "${GREEN}         DAFTAR AKUN SAAT INI            ${NC}"
+            echo -e "${CYAN}=========================================${NC}"
+            bash /usr/local/bin/zi.sh list
+            echo -e "${CYAN}=========================================${NC}"
+            bash /usr/local/bin/zi.sh del
+            read -n 1 -s -r -p "Tekan enter untuk kembali..."
+            ;;
         5)
-            echo -e "\n========================================="
-            echo -e "         PERPANJANG AKUN PREMIUM         "
-            echo -e "========================================="
+            clear
+            echo -e "${CYAN}=========================================${NC}"
+            echo -e "${GREEN}         DAFTAR AKUN SAAT INI            ${NC}"
+            echo -e "${CYAN}=========================================${NC}"
+            bash /usr/local/bin/zi.sh list
+            echo -e "${CYAN}=========================================${NC}"
+            echo -e "${GREEN}         PERPANJANG AKUN PREMIUM         ${NC}"
+            echo -e "${CYAN}=========================================${NC}"
             read -p " Masukkan Password : " RENEW_PASS
             read -p " Masukkan Masa Aktif (Hari): " RENEW_DAYS
             bash /usr/local/bin/zi.sh renew "$RENEW_PASS" "$RENEW_DAYS"
