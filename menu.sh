@@ -100,41 +100,47 @@ while true; do
     echo -e " [2]  Buat Akun Premium"
     echo -e " [3]  Lihat Daftar Semua Akun"
     echo -e " [4]  Hapus Akun"
-    echo -e " [5]  Ubah Domain Server"
-    echo -e " [6]  Backup Database"
-    echo -e " [7]  Restore Database"
-    echo -e " [8]  Setup API Gateway Bot"
-    echo -e " [9]  Restart Semua Layanan VPS"
-    echo -e " [10] Atur Auto Reboot VPS"
-    echo -e " [11] Perbarui Skrip & Engine (Update)"
-    echo -e " [12] Uninstaller Script"
-    echo -e " [13] Keluar"
+    echo -e " [5]  Hapus Semua Akun Expired"
+    echo -e " [6]  Ubah Domain Server"
+    echo -e " [7]  Backup Database"
+    echo -e " [8]  Restore Database"
+    echo -e " [9]  Setup API Gateway Bot"
+    echo -e " [10] Restart Semua Layanan VPS"
+    echo -e " [11] Atur Auto Reboot VPS"
+    echo -e " [12] Perbarui Skrip & Engine (Update)"
+    echo -e " [13] Uninstaller Script"
+    echo -e " [14] Keluar"
     echo -e "${CYAN}=========================================${NC}"
-    read -p " Pilih opsi [1-13]: " opt
+    read -p " Pilih opsi [1-14]: " opt
 
     case $opt in
         1) bash /usr/local/bin/zi.sh trial; read -n 1 -s -r -p "Tekan enter untuk kembali...";;
         2) bash /usr/local/bin/zi.sh add; read -n 1 -s -r -p "Tekan enter untuk kembali...";;
         3) bash /usr/local/bin/zi.sh list; read -n 1 -s -r -p "Tekan enter untuk kembali...";;
         4) bash /usr/local/bin/zi.sh del; read -n 1 -s -r -p "Tekan enter untuk kembali...";;
-        5) bash /usr/local/bin/zi.sh domain; read -n 1 -s -r -p "Tekan enter untuk kembali...";;
-        6) bash /usr/local/bin/zi.sh backup; read -n 1 -s -r -p "Tekan enter untuk kembali...";;
-        7) bash /usr/local/bin/zi.sh restore; read -n 1 -s -r -p "Tekan enter untuk kembali...";;
-        8) bash /usr/local/bin/zi.sh api; read -n 1 -s -r -p "Tekan enter untuk kembali...";;
-        9) 
+        5) 
+            echo -e "\n⏳ Sedang menghapus seluruh akun yang kedaluwarsa..."
+            bash /usr/local/bin/zi.sh del-expired
+            read -n 1 -s -r -p "Tekan enter untuk kembali..."
+            ;;
+        6) bash /usr/local/bin/zi.sh domain; read -n 1 -s -r -p "Tekan enter untuk kembali...";;
+        7) bash /usr/local/bin/zi.sh backup; read -n 1 -s -r -p "Tekan enter untuk kembali...";;
+        8) bash /usr/local/bin/zi.sh restore; read -n 1 -s -r -p "Tekan enter untuk kembali...";;
+        9) bash /usr/local/bin/zi.sh api; read -n 1 -s -r -p "Tekan enter untuk kembali...";;
+        10) 
             echo -e "\n⏳ Sedang melakukan restart layanan..."
             bash /usr/local/bin/zi.sh restart
             echo -e "${GREEN}✔ Layanan berhasil dinyalakan ulang!${NC}"
             sleep 2
             ;;
-        10) configure_auto_reboot ;;
-        11)
+        11) configure_auto_reboot ;;
+        12)
             echo -e "\n⏳ Sedang memeriksa dan memperbarui komponen skrip..."
             bash /usr/local/bin/zi.sh update
             echo -e "${GREEN}✔ Pembaruan skrip dan mesin berhasil dilakukan!${NC}"
             sleep 2
             ;;
-        12) 
+        13) 
             read -p "Apakah yakin ingin hapus SC? [y/n]: " yakin
             if [[ "$yakin" == "y" || "$yakin" == "Y" ]]; then
                 bash /usr/local/bin/zi.sh uninstall
@@ -144,7 +150,7 @@ while true; do
                 exit 0
             fi
             ;;
-        13) clear; exit 0;;
+        14) clear; exit 0;;
         *) echo "Pilihan tidak tersedia!"; sleep 1;;
     esac
 done
