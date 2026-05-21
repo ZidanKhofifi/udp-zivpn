@@ -191,7 +191,7 @@ END
     PostKernel
     RoutingTables
     
-    # Penjadwalan Pembersihan Akun Expired Setiap Menit (Tanpa Hapus DB Utama)
+    # Penjadwalan Pembersihan Akun Expired Setiap Menit
     echo "* * * * * root bash /usr/local/bin/zi.sh clean >/dev/null 2>&1" > /etc/cron.d/zivpn-cleaner
     chmod 644 /etc/cron.d/zivpn-cleaner
     systemctl restart cron >/dev/null 2>&1
@@ -619,4 +619,19 @@ case "$1" in
 
   'restart')
     systemctl restart zivpn >/dev/null 2>&1
-    systemctl
+    systemctl restart z-api >/dev/null 2>&1
+    echo "Done"
+    ;;
+
+  'update')
+    echo "[*] Memulai pembaruan otomatis..."
+    sync_to_zivpn_json
+    systemctl restart zivpn >/dev/null 2>&1
+    systemctl restart z-api >/dev/null 2>&1
+    echo "Layanan berhasil diperbarui dan dijalankan ulang."
+    ;;
+    
+  *)
+    echo -e "\n Gunakan perintah: zi.sh [install|uninstall|api|add|renew|trial|del|list|domain|backup|restore|clean|del-expired|status|restart|update]\n"
+    ;;
+esac
