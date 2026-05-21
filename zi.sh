@@ -444,16 +444,25 @@ case "$1" in
     
     today_epoch=$(date +%s)
     
-    # Perbaikan kalkulasi waktu menggunakan aritmetika Bash (detik) untuk menghindari galat date
+    # Ekstrak angka durasi lama untuk kalkulasi akumulatif
+    old_days_count=$(echo "$old_duration" | grep -o -E '[0-9]+')
+    if [[ -z "$old_days_count" || ! "$old_days_count" =~ ^[0-9]+$ ]]; then
+        old_days_count=0
+    fi
+    
     added_seconds=$((RENEW_DAYS * 86400))
     if [[ -n "$old_exp" && "$old_exp" =~ ^[0-9]+$ && "$old_exp" -gt "$today_epoch" ]]; then
+        # Jika masih aktif: akumulasikan tanggal expired dan akumulasikan juga teks info durasi harian
         new_exp=$((old_exp + added_seconds))
+        new_duration_display="$((old_days_count + RENEW_DAYS)) Hari"
     else
+        # Jika sudah expired: hitung baru dari sekarang, durasi harian hanya menggunakan durasi input baru
         new_exp=$((today_epoch + added_seconds))
+        new_duration_display="${RENEW_DAYS} Hari"
     fi
     
     sed -i "/^$RENEW_PASS|/d" "$DB_FILE"
-    echo "$RENEW_PASS|$RENEW_DAYS Hari|$new_exp" >> "$DB_FILE"
+    echo "$RENEW_PASS|$new_duration_display|$new_exp" >> "$DB_FILE"
     sync_to_zivpn_json
     
     readable_exp=$(date -d "@$new_exp" "+%Y-%m-%d %H:%M:%S")
@@ -462,7 +471,7 @@ case "$1" in
     echo -e "========================================="
     echo -e " Host/Domain: $CURRENT_DOMAIN"
     echo -e " Password   : $RENEW_PASS"
-    echo -e " Masa Aktif : $RENEW_DAYS Hari"
+    echo -e " Masa Aktif : $new_duration_display"
     echo -e " Expired On : $readable_exp"
     echo -e " Port Range : 6000 - 19999 (UDP)"
     echo -e "=========================================\n"
