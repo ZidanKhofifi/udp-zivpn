@@ -1,4 +1,4 @@
-```bash
+
 #!/bin/bash
 # Modul ZiVPN UDP - Versi Premium Modifikasi
 # Mesin Inti oleh Zahid Islam & Potato
