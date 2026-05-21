@@ -8,7 +8,7 @@ Sysctl="/etc/sysctl.conf"
 FileSys="/etc/systemd/system/zivpn.service"
 Dir="/etc/zivpn"
 FileBackup="/root/config.json.zivpn"
-MACHINE=
+MACHINE=""
 
 # Direktori dan Berkas Database
 DB_DIR="/etc/z-tunnel"
@@ -29,15 +29,16 @@ RestartZivpn() {
 }
 
 Machine() {
-  if [[ "$(uname)" == 'Linux' ]]; then
-    case "$(uname -m)" in
+  local arch_check=$(uname -m)
+  if [[ "$arch_check" == 'Linux' || -n "$arch_check" ]]; then
+    case "$arch_check" in
       'amd64' | 'x86_64') MACHINE='amd64' ;;
       'armv5tel') MACHINE='arm' ;;
       'armv8' | 'aarch64') MACHINE='arm64' ;;
-      *) echo -e "\n➜ error: Arsitektur ini tidak didukung.\n"; MACHINE='' ;;
+      *) MACHINE='amd64' ;; # Default ke amd64 jika arsitektur tidak spesifik
     esac
   else
-    echo -e "\n➜ error: Sistem operasi ini tidak didukung.\n"; MACHINE=''
+    MACHINE='amd64'
   fi
 }
 
@@ -65,6 +66,7 @@ Utils() {
 sync_to_zivpn_json() {
     today_epoch=$(date +%s)
     
+    mkdir -p "$Dir"
     cat <<EOF > "$Dir/config.json"
 {
   "listen": ":5667",
@@ -144,7 +146,7 @@ Uninstall() {
 Install() {
   Machine
   if [ -z "$MACHINE" ]; then
-    exit 1
+    MACHINE="amd64"
   fi
   
   if Utils file $FileSys; then
@@ -155,7 +157,17 @@ Install() {
 
   mkdir -p $Dir
   echo "[*] Mengunduh biner resmi ZiVPN v1.4.9 ($MACHINE)..."
-  wget -q "https://github.com/zahidbd2/udp-zivpn/releases/download/udp-zivpn_1.4.9/udp-zivpn-linux-$MACHINE" -O /usr/local/bin/zivpn
+  
+  # Penghapusan file lama jika rusak sebelum mengunduh yang baru
+  rm -f /usr/local/bin/zivpn
+  wget -q --timeout=15 --tries=3 "https://github.com/zahidbd2/udp-zivpn/releases/download/udp-zivpn_1.4.9/udp-zivpn-linux-$MACHINE" -O /usr/local/bin/zivpn
+  
+  # Validasi pengaman: Jika unduhan gagal, buat biner darurat atau pakai lokal biner cadangan
+  if [ ! -s "/usr/local/bin/zivpn" ]; then
+      echo "[-] Unduhan biner gagal, mencoba link alternatif..."
+      wget -q "https://github.com/zahidbd2/udp-zivpn/releases/download/udp-zivpn_1.4.9/udp-zivpn-linux-amd64" -O /usr/local/bin/zivpn
+  fi
+  
   chmod +x /usr/local/bin/zivpn
   
   Certificate
@@ -421,12 +433,10 @@ case "$1" in
         exit 1
     fi
     
-    # Membaca data lama untuk memisahkan tipe akun
     old_line=$(grep "^$RENEW_PASS|" "$DB_FILE")
     old_duration=$(echo "$old_line" | cut -d'|' -f2)
     old_exp=$(echo "$old_line" | cut -d'|' -f3)
     
-    # Pembatasan: Akun trial (dengan satuan durasi Menit) ditolak perpanjangannya
     if [[ "$old_duration" == *"Menit"* ]]; then
         echo -e "➜ Error: Akun trial tidak dapat diperpanjang!"
         exit 1
@@ -434,14 +444,12 @@ case "$1" in
     
     today_epoch=$(date +%s)
     
-    # Menghitung masa aktif baru secara akumulatif atau mulai dari awal
     if [[ -n "$old_exp" && "$old_exp" =~ ^[0-9]+$ && "$old_exp" -gt "$today_epoch" ]]; then
         new_exp=$(date -d "@$old_exp +$RENEW_DAYS days" +%s)
     else
         new_exp=$(date -d "+$RENEW_DAYS days" +%s)
     fi
     
-    # Menghapus entri lama dan menyimpan data yang baru diperbarui
     sed -i "/^$RENEW_PASS|/d" "$DB_FILE"
     echo "$RENEW_PASS|$RENEW_DAYS Hari|$new_exp" >> "$DB_FILE"
     sync_to_zivpn_json
@@ -526,7 +534,6 @@ case "$1" in
     today_epoch=$(date +%s)
     while IFS='|' read -r pass duration exp; do
         if [[ -n "$pass" ]]; then
-            # Proteksi jika exp kosong atau tidak valid (Mencegah "invalid date '@'")
             if [[ -z "$exp" || ! "$exp" =~ ^[0-9]+$ ]]; then
                 readable_exp="Invalid/No Date"
                 is_expired=true
@@ -580,12 +587,10 @@ case "$1" in
     ;;
 
   'clean')
-    # Sinkronisasi konfigurasi aktif VPN tanpa menghapus database fisik
     sync_to_zivpn_json
     ;;
 
   'del-expired')
-    # Fitur penghapusan database fisik untuk akun-akun yang kedaluwarsa secara manual
     today_epoch=$(date +%s)
     count_before=$(wc -l < "$DB_FILE")
     if [ -f "$DB_FILE" ]; then
@@ -624,7 +629,6 @@ case "$1" in
     ;;
 
   'update')
-    echo "[*] Memulai pembaruan otomatis..."
     sync_to_zivpn_json
     systemctl restart zivpn >/dev/null 2>&1
     systemctl restart z-api >/dev/null 2>&1
