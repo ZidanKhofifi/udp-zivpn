@@ -191,7 +191,7 @@ END
     PostKernel
     RoutingTables
     
-    # Penjadwalan Pembersihan Akun Expired Setiap Menit
+    # Penjadwalan Pembersihan Akun Expired Setiap Menit (Tanpa Hapus DB Utama)
     echo "* * * * * root bash /usr/local/bin/zi.sh clean >/dev/null 2>&1" > /etc/cron.d/zivpn-cleaner
     chmod 644 /etc/cron.d/zivpn-cleaner
     systemctl restart cron >/dev/null 2>&1
@@ -316,6 +316,13 @@ app.delete('/account', authenticate, (req, res) => {
     exec(\`bash /usr/local/bin/zi.sh del "\${password}"\`, (err, stdout) => {
         if (err) return res.status(500).json({ status: false, error: err.message });
         return res.json({ status: true, message: 'Account Deleted', output: stdout });
+    });
+});
+
+app.post('/del-expired', authenticate, (req, res) => {
+    exec('bash /usr/local/bin/zi.sh del-expired', (err, stdout) => {
+        if (err) return res.status(500).json({ status: false, error: err.message });
+        return res.json({ status: true, message: 'Expired Accounts Deleted', output: stdout });
     });
 });
 
@@ -556,8 +563,27 @@ case "$1" in
     ;;
 
   'clean')
-    # Sinkronisasi konfigurasi aktif VPN tanpa menghapus database fisik
+    # Hanya melakukan sinkronisasi tanpa menghapus database utama
     sync_to_zivpn_json
+    ;;
+
+  'del-expired')
+    # Fitur penghapusan manual database untuk akun-akun yang telah kedaluwarsa
+    today_epoch=$(date +%s)
+    count_before=$(wc -l < "$DB_FILE")
+    if [ -f "$DB_FILE" ]; then
+        touch "${DB_FILE}.tmp"
+        while IFS='|' read -r pass duration exp; do
+            if [[ -n "$pass" && -n "$exp" && "$exp" -ge "$today_epoch" ]]; then
+                echo "$pass|$duration|$exp" >> "${DB_FILE}.tmp"
+            fi
+        done < "$DB_FILE"
+        mv "${DB_FILE}.tmp" "$DB_FILE"
+        sync_to_zivpn_json
+    fi
+    count_after=$(wc -l < "$DB_FILE")
+    deleted_count=$((count_before - count_after))
+    echo "Selesai. Berhasil menghapus $deleted_count akun kedaluwarsa dari database."
     ;;
 
   'status')
@@ -589,6 +615,6 @@ case "$1" in
     ;;
     
   *)
-    echo -e "\n Gunakan perintah: zi.sh [install|uninstall|api|add|renew|trial|del|list|domain|backup|restore|clean|status|restart|update]\n"
+    echo -e "\n Gunakan perintah: zi.sh [install|uninstall|api|add|renew|trial|del|list|domain|backup|restore|clean|del-expired|status|restart|update]\n"
     ;;
 esac
