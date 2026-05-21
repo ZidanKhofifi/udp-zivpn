@@ -286,7 +286,9 @@ app.post('/renew', authenticate, (req, res) => {
     if (!password || !days) return res.status(400).json({ status: false, message: 'Parameter tidak lengkap' });
     exec(\`bash /usr/local/bin/zi.sh renew "\${password}" "\${days}"\`, (err, stdout) => {
         if (err) return res.status(500).json({ status: false, error: err.message });
-        if (stdout.includes("Error")) return res.status(400).json({ status: false, error: stdout.trim() });
+        if (stdout.includes("Error") || stdout.includes("error") || stdout.includes("Gagal")) {
+            return res.status(400).json({ status: false, error: stdout.trim() });
+        }
         return res.json({ status: true, message: 'Account Renewed', output: stdout });
     });
 });
@@ -419,25 +421,28 @@ case "$1" in
         exit 1
     fi
     
-    # Baca data lama
+    # Membaca data lama untuk memisahkan tipe akun
     old_line=$(grep "^$RENEW_PASS|" "$DB_FILE")
+    old_duration=$(echo "$old_line" | cut -d'|' -f2)
     old_exp=$(echo "$old_line" | cut -d'|' -f3)
+    
+    # Pembatasan: Akun trial (dengan satuan durasi Menit) ditolak perpanjangannya
+    if [[ "$old_duration" == *"Menit"* ]]; then
+        echo -e "➜ Error: Akun trial tidak dapat diperpanjang!"
+        exit 1
+    fi
     
     today_epoch=$(date +%s)
     
-    # Hitung masa aktif baru
-    if [[ "$old_exp" -gt "$today_epoch" ]]; then
-        # Jika akun masih aktif, akumulasikan dari sisa waktu kedaluwarsa lama
+    # Menghitung masa aktif baru secara akumulatif atau mulai dari awal
+    if [[ -n "$old_exp" && "$old_exp" =~ ^[0-9]+$ && "$old_exp" -gt "$today_epoch" ]]; then
         new_exp=$(date -d "@$old_exp +$RENEW_DAYS days" +%s)
     else
-        # Jika akun sudah habis, buat masa aktif baru terhitung mulai dari sekarang
         new_exp=$(date -d "+$RENEW_DAYS days" +%s)
     fi
     
-    # Hapus data lama dari database
+    # Menghapus entri lama dan menyimpan data yang baru diperbarui
     sed -i "/^$RENEW_PASS|/d" "$DB_FILE"
-    
-    # Masukkan data baru yang diperbarui
     echo "$RENEW_PASS|$RENEW_DAYS Hari|$new_exp" >> "$DB_FILE"
     sync_to_zivpn_json
     
@@ -521,8 +526,20 @@ case "$1" in
     today_epoch=$(date +%s)
     while IFS='|' read -r pass duration exp; do
         if [[ -n "$pass" ]]; then
-            readable_exp=$(date -d "@$exp" "+%Y-%m-%d %H:%M:%S")
-            if [[ "$exp" -lt "$today_epoch" ]]; then
+            # Proteksi jika exp kosong atau tidak valid (Mencegah "invalid date '@'")
+            if [[ -z "$exp" || ! "$exp" =~ ^[0-9]+$ ]]; then
+                readable_exp="Invalid/No Date"
+                is_expired=true
+            else
+                readable_exp=$(date -d "@$exp" "+%Y-%m-%d %H:%M:%S" 2>/dev/null || echo "Invalid Date")
+                if [[ "$exp" -lt "$today_epoch" ]]; then
+                    is_expired=true
+                else
+                    is_expired=false
+                fi
+            fi
+
+            if [ "$is_expired" = true ]; then
                 printf "%-15s | %-12s | %-19s \033[0;31m(Expired)\033[0m\n" "$pass" "$duration" "$readable_exp"
             else
                 printf "%-15s | %-12s | %-19s \033[0;32m(Aktif)\033[0m\n" "$pass" "$duration" "$readable_exp"
@@ -563,12 +580,12 @@ case "$1" in
     ;;
 
   'clean')
-    # Hanya melakukan sinkronisasi tanpa menghapus database utama
+    # Sinkronisasi konfigurasi aktif VPN tanpa menghapus database fisik
     sync_to_zivpn_json
     ;;
 
   'del-expired')
-    # Fitur penghapusan manual database untuk akun-akun yang telah kedaluwarsa
+    # Fitur penghapusan database fisik untuk akun-akun yang kedaluwarsa secara manual
     today_epoch=$(date +%s)
     count_before=$(wc -l < "$DB_FILE")
     if [ -f "$DB_FILE" ]; then
@@ -602,19 +619,4 @@ case "$1" in
 
   'restart')
     systemctl restart zivpn >/dev/null 2>&1
-    systemctl restart z-api >/dev/null 2>&1
-    echo "Done"
-    ;;
-
-  'update')
-    echo "[*] Memulai pembaruan otomatis..."
-    sync_to_zivpn_json
-    systemctl restart zivpn >/dev/null 2>&1
-    systemctl restart z-api >/dev/null 2>&1
-    echo "Layanan berhasil diperbarui dan dijalankan ulang."
-    ;;
-    
-  *)
-    echo -e "\n Gunakan perintah: zi.sh [install|uninstall|api|add|renew|trial|del|list|domain|backup|restore|clean|del-expired|status|restart|update]\n"
-    ;;
-esac
+    systemctl
