@@ -444,10 +444,12 @@ case "$1" in
     
     today_epoch=$(date +%s)
     
+    # Perbaikan kalkulasi waktu menggunakan aritmetika Bash (detik) untuk menghindari galat date
+    added_seconds=$((RENEW_DAYS * 86400))
     if [[ -n "$old_exp" && "$old_exp" =~ ^[0-9]+$ && "$old_exp" -gt "$today_epoch" ]]; then
-        new_exp=$(date -d "@$old_exp +$RENEW_DAYS days" +%s)
+        new_exp=$((old_exp + added_seconds))
     else
-        new_exp=$(date -d "+$RENEW_DAYS days" +%s)
+        new_exp=$((today_epoch + added_seconds))
     fi
     
     sed -i "/^$RENEW_PASS|/d" "$DB_FILE"
