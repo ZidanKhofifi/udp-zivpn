@@ -1,7 +1,7 @@
 #!/bin/bash
-# Zivpn UDP Module installer - Premium Modified Version
-# Base Core Engine by Zahid Islam & Potato
-# Modified by ZidanKhofifi
+# Modul ZiVPN UDP - Versi Premium Modifikasi
+# Mesin Inti oleh Zahid Islam & Potato
+# Dimodifikasi oleh ZidanKhofifi
 
 NIC=$(ip -4 route ls | grep default | grep -Po '(?<=dev )(\S+)' | head -1)
 Sysctl="/etc/sysctl.conf"
@@ -10,7 +10,7 @@ Dir="/etc/zivpn"
 FileBackup="/root/config.json.zivpn"
 MACHINE=
 
-# Folder Database Tambahan
+# Direktori dan Berkas Database
 DB_DIR="/etc/z-tunnel"
 DB_FILE="$DB_DIR/database.db"
 DOMAIN_FILE="$DB_DIR/domain"
@@ -61,7 +61,7 @@ Utils() {
   esac
 }
 
-# Fungsi Sinkronisasi: Merakit ulang config.json dalam format Array JSON dengan Unix Epoch
+# Sinkronisasi Database ke Berkas Konfigurasi ZiVPN
 sync_to_zivpn_json() {
     today_epoch=$(date +%s)
     
@@ -133,7 +133,6 @@ Uninstall() {
     iptables -t nat -D PREROUTING -i $NIC -p udp --dport 6000:19999 -j DNAT --to-destination :5667
   fi
   
-  # Hapus komponen API jika ada
   systemctl stop z-api 2>/dev/null
   systemctl disable z-api 2>/dev/null
   rm -f /etc/systemd/system/z-api.service
@@ -162,7 +161,7 @@ Install() {
   Certificate
   sync_to_zivpn_json
 
-  # Buat berkas Systemd Service (Dengan fitur AUTO-RESTART aktif)
+  # Konfigurasi Systemd Service ZiVPN dengan fitur Auto-Restart
   cat > /etc/systemd/system/zivpn.service <<-END
 [Unit]
 Description=zivpn VPN Server Premium Mod
@@ -192,7 +191,7 @@ END
     PostKernel
     RoutingTables
     
-    # Daftarkan pembersih otomatis menit kustom (Cron Job setiap menit)
+    # Penjadwalan Pembersihan Akun Expired Setiap Menit
     echo "* * * * * root bash /usr/local/bin/zi.sh clean >/dev/null 2>&1" > /etc/cron.d/zivpn-cleaner
     chmod 644 /etc/cron.d/zivpn-cleaner
     systemctl restart cron >/dev/null 2>&1
@@ -208,14 +207,14 @@ SetupAPI() {
     echo -e "\n========================================="
     echo -e "       KONFIGURASI API GATEWAY BOT       "
     echo -e "========================================="
-    read -p " Masukkan API Key Rahasia Anda: " USER_KEY
+    read -p " Masukkan API Key Rahasia: " USER_KEY
     if [ -z "$USER_KEY" ]; then
         echo -e "\n➜ Error: API Key tidak boleh kosong!\n"
         exit 1
     fi
 
     echo "[*] Memeriksa komponen Node.js..."
-    if ! command -v node &> /dev/null; then
+    if ! command -v node &>/dev/null; then
         echo "[*] Menginstal Node.js dan npm..."
         curl -fsSL https://deb.nodesource.com/setup_18.x | bash - &>/dev/null
         apt-get install -y nodejs &>/dev/null
@@ -223,7 +222,7 @@ SetupAPI() {
 
     mkdir -p /etc/z-api
     cd /etc/z-api
-    echo "[*] Memasang library pendukung (Express)..."
+    echo "[*] Memasang pustaka Express..."
     npm init -y &>/dev/null
     npm install express &>/dev/null
 
@@ -248,14 +247,14 @@ const authenticate = (req, res, next) => {
 
 app.get('/list', authenticate, (req, res) => {
     exec('bash /usr/local/bin/zi.sh list', (err, stdout) => {
-        if (err) return res.status(500).json({ status: false, message: 'Gagal ambil data' });
+        if (err) return res.status(500).json({ status: false, message: 'Gagal mengambil data' });
         return res.json({ status: true, output: stdout });
     });
 });
 
 app.get('/status', authenticate, (req, res) => {
     exec('bash /usr/local/bin/zi.sh status', (err, stdout) => {
-        if (err) return res.status(500).json({ status: false, message: 'Gagal ambil status' });
+        if (err) return res.status(500).json({ status: false, message: 'Gagal mengambil status' });
         const parts = stdout.trim().split('|');
         const zivpn = parts[0] ? parts[0].split(':')[1] : 'Inactive';
         const zapi = parts[1] ? parts[1].split(':')[1] : 'Inactive';
@@ -264,16 +263,12 @@ app.get('/status', authenticate, (req, res) => {
 });
 
 app.post('/restart', authenticate, (req, res) => {
-    // Kirim respons sukses ke bot WhatsApp terlebih dahulu
-    res.json({ status: true, message: 'Restart process initiated successfully' });
+    res.json({ status: true, message: 'Proses restart telah diinisialisasi' });
     
-    // Restart zivpn secara langsung
     exec('systemctl restart zivpn', (err) => {
         if (err) console.error('Gagal restart zivpn:', err.message);
     });
 
-    // Keluar dari proses Node setelah 1 detik agar respons HTTP selesai terkirim.
-    // Systemd dengan "Restart=always" akan otomatis menghidupkannya kembali dengan instan.
     setTimeout(() => {
         process.exit(0);
     }, 1000);
@@ -281,8 +276,18 @@ app.post('/restart', authenticate, (req, res) => {
 
 app.post('/update', authenticate, (req, res) => {
     exec('bash /usr/local/bin/zi.sh update', (err, stdout) => {
-        if (err) return res.status(500).json({ status: false, message: 'Gagal update service' });
-        return res.json({ status: true, message: 'Update completed successfully', output: stdout });
+        if (err) return res.status(500).json({ status: false, message: 'Gagal melakukan pembaruan' });
+        return res.json({ status: true, message: 'Pembaruan berhasil diselesaikan', output: stdout });
+    });
+});
+
+app.post('/renew', authenticate, (req, res) => {
+    const { password, days } = req.body;
+    if (!password || !days) return res.status(400).json({ status: false, message: 'Parameter tidak lengkap' });
+    exec(\`bash /usr/local/bin/zi.sh renew "\${password}" "\${days}"\`, (err, stdout) => {
+        if (err) return res.status(500).json({ status: false, error: err.message });
+        if (stdout.includes("Error")) return res.status(400).json({ status: false, error: stdout.trim() });
+        return res.json({ status: true, message: 'Account Renewed', output: stdout });
     });
 });
 
@@ -295,19 +300,19 @@ app.post('/account', authenticate, (req, res) => {
             return res.json({ status: true, message: 'Trial Created', output: stdout });
         });
     } else if (type === 'premium') {
-        if (!password || !days) return res.status(400).json({ status: false, message: 'Missing parameters' });
+        if (!password || !days) return res.status(400).json({ status: false, message: 'Parameter tidak lengkap' });
         exec(\`bash /usr/local/bin/zi.sh add "\${password}" "\${days}"\`, (err, stdout) => {
             if (err) return res.status(500).json({ status: false, error: err.message });
             return res.json({ status: true, message: 'Premium Created', output: stdout });
         });
     } else {
-        res.status(400).json({ status: false, message: 'Invalid type' });
+        res.status(400).json({ status: false, message: 'Tipe akun tidak valid' });
     }
 });
 
 app.delete('/account', authenticate, (req, res) => {
     const { password } = req.body;
-    if (!password) return res.status(400).json({ status: false, message: 'Missing password' });
+    if (!password) return res.status(400).json({ status: false, message: 'Password harus disertakan' });
     exec(\`bash /usr/local/bin/zi.sh del "\${password}"\`, (err, stdout) => {
         if (err) return res.status(500).json({ status: false, error: err.message });
         return res.json({ status: true, message: 'Account Deleted', output: stdout });
@@ -317,7 +322,7 @@ app.delete('/account', authenticate, (req, res) => {
 app.listen(PORT);
 EOF
 
-    # Buat berkas Systemd Service API (Dengan fitur AUTO-RESTART aktif)
+    # Konfigurasi Systemd Service API Gateway dengan fitur Auto-Restart
     cat > /etc/systemd/system/z-api.service <<-END
 [Unit]
 Description=API Gateway Z-Tunnel
@@ -388,6 +393,54 @@ case "$1" in
     echo -e " Host/Domain: $CURRENT_DOMAIN"
     echo -e " Password   : $PREMIUM_PASS"
     echo -e " Masa Aktif : $PREMIUM_DAYS Hari"
+    echo -e " Expired On : $readable_exp"
+    echo -e " Port Range : 6000 - 19999 (UDP)"
+    echo -e "=========================================\n"
+    ;;
+    
+  'renew')
+    RENEW_PASS="$2"
+    RENEW_DAYS="$3"
+    
+    if [[ -z "$RENEW_PASS" || -z "$RENEW_DAYS" || ! "$RENEW_DAYS" =~ ^[0-9]+$ ]]; then
+        echo -e "➜ Error: Parameter tidak valid."
+        exit 1
+    fi
+    
+    if ! grep -q "^$RENEW_PASS|" "$DB_FILE"; then
+        echo -e "➜ Error: Password tidak ditemukan."
+        exit 1
+    fi
+    
+    # Baca data lama
+    old_line=$(grep "^$RENEW_PASS|" "$DB_FILE")
+    old_exp=$(echo "$old_line" | cut -d'|' -f3)
+    
+    today_epoch=$(date +%s)
+    
+    # Hitung masa aktif baru
+    if [[ "$old_exp" -gt "$today_epoch" ]]; then
+        # Jika akun masih aktif, akumulasikan dari sisa waktu kedaluwarsa lama
+        new_exp=$(date -d "@$old_exp +$RENEW_DAYS days" +%s)
+    else
+        # Jika akun sudah habis, buat masa aktif baru terhitung mulai dari sekarang
+        new_exp=$(date -d "+$RENEW_DAYS days" +%s)
+    fi
+    
+    # Hapus data lama dari database
+    sed -i "/^$RENEW_PASS|/d" "$DB_FILE"
+    
+    # Masukkan data baru yang diperbarui
+    echo "$RENEW_PASS|$RENEW_DAYS Hari|$new_exp" >> "$DB_FILE"
+    sync_to_zivpn_json
+    
+    readable_exp=$(date -d "@$new_exp" "+%Y-%m-%d %H:%M:%S")
+    echo -e "\n========================================="
+    echo -e "      SUKSES MEMPERPANJANG AKUN PREMIUM  "
+    echo -e "========================================="
+    echo -e " Host/Domain: $CURRENT_DOMAIN"
+    echo -e " Password   : $RENEW_PASS"
+    echo -e " Masa Aktif : $RENEW_DAYS Hari"
     echo -e " Expired On : $readable_exp"
     echo -e " Port Range : 6000 - 19999 (UDP)"
     echo -e "=========================================\n"
@@ -503,17 +556,8 @@ case "$1" in
     ;;
 
   'clean')
-    today_epoch=$(date +%s)
-    if [ -f "$DB_FILE" ]; then
-        touch "${DB_FILE}.tmp"
-        while IFS='|' read -r pass duration exp; do
-            if [[ -n "$pass" && -n "$exp" && "$exp" -ge "$today_epoch" ]]; then
-                echo "$pass|$duration|$exp" >> "${DB_FILE}.tmp"
-            fi
-        done < "$DB_FILE"
-        mv "${DB_FILE}.tmp" "$DB_FILE"
-        sync_to_zivpn_json
-    fi
+    # Sinkronisasi konfigurasi aktif VPN tanpa menghapus database fisik
+    sync_to_zivpn_json
     ;;
 
   'status')
@@ -545,6 +589,6 @@ case "$1" in
     ;;
     
   *)
-    echo -e "\n Gunakan perintah: zi.sh [install|uninstall|api|add|trial|del|list|domain|backup|restore|clean|status|restart|update]\n"
+    echo -e "\n Gunakan perintah: zi.sh [install|uninstall|api|add|renew|trial|del|list|domain|backup|restore|clean|status|restart|update]\n"
     ;;
 esac
